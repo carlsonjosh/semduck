@@ -16,11 +16,11 @@ def build_parser() -> argparse.ArgumentParser:
     init_cmd = subparsers.add_parser("init")
     init_cmd.add_argument("--db", required=True)
 
-    validate_cmd = subparsers.add_parser("validate-yaml")
-    validate_cmd.add_argument("--db", required=True)
-    validate_cmd.add_argument("--file", required=True)
+    check_cmd = subparsers.add_parser("check")
+    check_cmd.add_argument("--db", required=True)
+    check_cmd.add_argument("--file", required=True)
 
-    load_cmd = subparsers.add_parser("load-yaml")
+    load_cmd = subparsers.add_parser("load")
     load_cmd.add_argument("--db", required=True)
     load_cmd.add_argument("--file", required=True)
     load_cmd.add_argument("--no-replace", action="store_true")
@@ -51,20 +51,20 @@ def main(argv: list[str] | None = None) -> int:
                 print("ok init")
                 return 0
 
-            if args.command == "validate-yaml":
+            if args.command == "check":
                 init_registry(conn)
                 result = load_semantic_yaml_file(conn, args.file, validate_only=True)
-                print(f"ok validate-yaml view_name={result.view_name}")
+                print(f"ok check view_name={result.view_name}")
                 return 0
 
-            if args.command == "load-yaml":
+            if args.command == "load":
                 init_registry(conn)
                 result = load_semantic_yaml_file(
                     conn,
                     args.file,
                     replace_existing=not args.no_replace,
                 )
-                print(f"ok load-yaml view_name={result.view_name}")
+                print(f"ok load view_name={result.view_name}")
                 return 0
 
             if args.command == "compile":

@@ -7,7 +7,7 @@ Portable semantic view runtime for DuckDB, implemented in Python.
 ```bash
 uv sync
 uv run semduck init --db demo.duckdb
-uv run semduck load-yaml --db demo.duckdb --file examples/orders_semantic.yaml
+uv run semduck load --db demo.duckdb --file examples/orders_semantic.yaml
 uv run semduck compile --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
 ```
 
