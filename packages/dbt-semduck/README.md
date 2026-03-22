@@ -34,3 +34,16 @@ from (
   ) }}
 )
 ```
+
+The request suffix can also be split across lines for readability:
+
+```jinja
+select *
+from (
+  {{ dbt_semduck.query(
+      ref('orders_semantic_node'),
+      'dimensions region
+       metrics total_revenue'
+  ) }}
+)
+```
