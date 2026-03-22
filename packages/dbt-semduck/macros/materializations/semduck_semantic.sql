@@ -1,13 +1,5 @@
 {% materialization semduck_semantic, default %}
-  {%- set configured_path = config.get('semduck_spec') -%}
-  {%- if configured_path is not none -%}
-    {%- set spec_path = dbt_semduck.semduck__spec_path(configured_path) -%}
-    {%- set loaded_name = dbt_semduck.semduck_load(spec_path) -%}
-    {%- set load_source = spec_path -%}
-  {%- else -%}
-    {%- set loaded_name = dbt_semduck.semduck_load_ddl(compiled_code) -%}
-    {%- set load_source = 'inline ddl' -%}
-  {%- endif -%}
+  {%- set loaded_name = dbt_semduck.semduck_load_ddl(compiled_code) -%}
   {%- set existing_relation = load_cached_relation(this) -%}
   {%- set target_relation = this.incorporate(type='view') -%}
   {%- set intermediate_relation = make_intermediate_relation(target_relation) -%}
@@ -45,6 +37,6 @@
   {{ drop_relation_if_exists(backup_relation) }}
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 
-  {{ log("loaded semduck definition from " ~ load_source ~ " as " ~ loaded_name, info=True) }}
+  {{ log("loaded semduck definition from inline ddl as " ~ loaded_name, info=True) }}
   {{ return({'relations': [target_relation]}) }}
 {% endmaterialization %}

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from semduck.api import (
@@ -11,7 +10,6 @@ from semduck.api import (
     load_semantic_ddl,
     load_semantic_spec,
 )
-from semduck.dbt.resolver import load_unresolved_dbt_spec, relation_map_from_json, resolve_dbt_spec
 
 try:
     from dbt.adapters.duckdb.plugins import BasePlugin
@@ -26,10 +24,6 @@ def _load_json_spec(spec_json: str) -> dict[str, Any]:
     if not isinstance(spec, dict):
         raise TypeError("resolved semantic spec must be a JSON object")
     return spec
-
-
-def _path_exists(path: str) -> bool:
-    return Path(path).exists()
 
 
 def _check_resolved_spec(spec_json: str) -> str:
@@ -54,24 +48,11 @@ def _load_ddl(conn: Any, ddl_text: str) -> str:
     return f"ok load view_name={result.view_name}"
 
 
-def _check_yaml_file(path: str, relation_map_json: str) -> str:
-    spec = resolve_dbt_spec(load_unresolved_dbt_spec(path), relation_map_from_json(relation_map_json))
-    result = check_semantic_spec(None, spec)  # type: ignore[arg-type]
-    return f"ok check view_name={result.view_name}"
-
-
-def _load_yaml_file(conn: Any, path: str, relation_map_json: str) -> str:
-    spec = resolve_dbt_spec(load_unresolved_dbt_spec(path), relation_map_from_json(relation_map_json))
-    result = load_semantic_spec(conn, spec)
-    return f"ok load view_name={result.view_name}"
-
-
 def _compile(conn: Any, request: str) -> str:
     return compile_request_sql(conn, request)
 
 
 def register_plugin_functions(conn: Any) -> None:
-    conn.create_function("semduck_path_exists", _path_exists, [str], bool)
     conn.create_function(
         "semduck_check_resolved_spec",
         lambda spec_json: _check_resolved_spec(spec_json),
@@ -95,19 +76,6 @@ def register_plugin_functions(conn: Any) -> None:
         "semduck_load_ddl",
         lambda ddl_text: _load_ddl(conn, ddl_text),
         [str],
-        str,
-        side_effects=True,
-    )
-    conn.create_function(
-        "semduck_check_yaml_file",
-        lambda path, relation_map_json: _check_yaml_file(path, relation_map_json),
-        [str, str],
-        str,
-    )
-    conn.create_function(
-        "semduck_load_yaml_file",
-        lambda path, relation_map_json: _load_yaml_file(conn, path, relation_map_json),
-        [str, str],
         str,
         side_effects=True,
     )

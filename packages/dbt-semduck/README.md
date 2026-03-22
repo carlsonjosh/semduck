@@ -23,8 +23,6 @@ table orders as {{ ref('orders') }}
   );
 ```
 
-If you still want file-based specs, `semduck_spec='path/to/spec.yml'` remains supported as a fallback.
-
 Downstream models can query a semantic request with:
 
 ```jinja
