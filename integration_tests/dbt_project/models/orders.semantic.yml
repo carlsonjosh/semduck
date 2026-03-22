@@ -1,0 +1,12 @@
+name: orders_semantic
+tables:
+  - name: orders
+    base_table:
+      ref: orders
+    dimensions:
+      - name: region
+        expr: region
+    metrics:
+      - name: total_revenue
+        metric_type: sum
+        expr: revenue

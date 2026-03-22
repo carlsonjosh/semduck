@@ -1,0 +1,14 @@
+name: raw_orders_semantic
+tables:
+  - name: raw_orders
+    base_table:
+      source:
+        name: raw
+        table: orders_seed
+    dimensions:
+      - name: region
+        expr: region
+    metrics:
+      - name: total_revenue
+        metric_type: sum
+        expr: revenue

@@ -18,7 +18,7 @@ def conn():
 
 @pytest.fixture
 def orders_yaml_path() -> Path:
-    return Path("examples/orders_semantic.yaml")
+    return Path(__file__).resolve().parents[1] / "examples" / "orders_semantic.yaml"
 
 
 @pytest.fixture

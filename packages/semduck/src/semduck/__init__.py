@@ -1,11 +1,15 @@
 from semduck.api import (
+    check_semantic_spec,
     compile_request,
+    compile_request_sql,
     execute_request,
     get_semantic_view,
     init_registry,
     load_semantic_yaml,
     load_semantic_yaml_file,
+    load_semantic_spec,
     parse_request,
+    register_connection,
 )
 from semduck.errors import (
     SemanticCompileError,
@@ -50,10 +54,14 @@ __all__ = [
     "SemanticViewError",
     "SemanticViewRegistry",
     "compile_request",
+    "compile_request_sql",
+    "check_semantic_spec",
     "execute_request",
     "get_semantic_view",
     "init_registry",
     "load_semantic_yaml",
     "load_semantic_yaml_file",
+    "load_semantic_spec",
     "parse_request",
+    "register_connection",
 ]

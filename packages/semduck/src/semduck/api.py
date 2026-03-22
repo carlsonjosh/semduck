@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,28 @@ def init_registry(conn: Any) -> None:
     init_registry_schema(conn)
 
 
+def load_semantic_spec(
+    conn: Any,
+    spec: dict[str, Any],
+    *,
+    replace_existing: bool = True,
+    validate_only: bool = False,
+    source_yaml: str | None = None,
+) -> LoadResult:
+    source = source_yaml or json.dumps(spec, sort_keys=True)
+    return write_semantic_view(
+        conn,
+        spec,
+        source_yaml=source,
+        replace_existing=replace_existing,
+        validate_only=validate_only,
+    )
+
+
+def check_semantic_spec(conn: Any, spec: dict[str, Any]) -> LoadResult:
+    return load_semantic_spec(conn, spec, validate_only=True)
+
+
 def load_semantic_yaml(
     conn: Any,
     yaml_text: str,
@@ -24,12 +47,12 @@ def load_semantic_yaml(
     validate_only: bool = False,
 ) -> LoadResult:
     spec = load_yaml_spec(yaml_text)
-    return write_semantic_view(
+    return load_semantic_spec(
         conn,
         spec,
-        source_yaml=yaml_text,
         replace_existing=replace_existing,
         validate_only=validate_only,
+        source_yaml=yaml_text,
     )
 
 
@@ -63,3 +86,14 @@ def compile_request(conn: Any, request: str) -> CompiledSemanticQuery:
 
 def execute_request(conn: Any, request: str):
     return execute_semantic_request(conn, request)
+
+
+def compile_request_sql(conn: Any, request: str) -> str:
+    return compile_request(conn, request).sql
+
+
+def register_connection(conn: Any) -> None:
+    from semduck.dbt.plugin import register_plugin_functions
+
+    init_registry(conn)
+    register_plugin_functions(conn)

@@ -1,0 +1,4 @@
+order_id,customer_id,region,revenue
+1,10,US,100
+2,11,US,150
+3,12,CA,200

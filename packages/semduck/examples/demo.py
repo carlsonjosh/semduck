@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import duckdb
 
 from semduck import compile_request, init_registry, load_semantic_yaml_file
 
 
 def main() -> None:
+    example_dir = Path(__file__).resolve().parent
     conn = duckdb.connect(":memory:")
     conn.execute("create schema mart")
     conn.execute(
@@ -29,7 +32,7 @@ def main() -> None:
     )
 
     init_registry(conn)
-    load_semantic_yaml_file(conn, "examples/orders_semantic.yaml")
+    load_semantic_yaml_file(conn, str(example_dir / "orders_semantic.yaml"))
     compiled = compile_request(
         conn,
         "orders_semantic dimensions region metrics total_revenue where region = 'US'",
