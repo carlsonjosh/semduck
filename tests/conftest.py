@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import duckdb
+import pytest
+
+from duckdb_semantic import init_registry, load_semantic_yaml_file
+
+
+@pytest.fixture
+def conn():
+    connection = duckdb.connect(":memory:")
+    init_registry(connection)
+    yield connection
+    connection.close()
+
+
+@pytest.fixture
+def orders_yaml_path() -> Path:
+    return Path("examples/orders_semantic.yaml")
+
+
+@pytest.fixture
+def loaded_conn(conn, orders_yaml_path):
+    conn.execute("create schema mart")
+    conn.execute(
+        """
+        create table mart.orders_base (
+            order_id integer,
+            customer_id integer,
+            region varchar,
+            order_date date,
+            revenue double
+        )
+        """
+    )
+    conn.execute(
+        """
+        create table mart.customers_base (
+            customer_id integer,
+            customer_segment varchar
+        )
+        """
+    )
+    conn.execute(
+        """
+        insert into mart.orders_base values
+            (1, 10, 'US', '2024-01-01', 100.0),
+            (2, 11, 'US', '2024-01-02', 150.0),
+            (3, 12, 'CA', '2024-01-03', 200.0)
+        """
+    )
+    conn.execute(
+        """
+        insert into mart.customers_base values
+            (10, 'Enterprise'),
+            (11, 'SMB'),
+            (12, 'Consumer')
+        """
+    )
+    load_semantic_yaml_file(conn, str(orders_yaml_path))
+    return conn
+

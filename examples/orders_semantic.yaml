@@ -1,0 +1,48 @@
+name: orders_semantic
+description: Orders analytics semantic view
+
+tables:
+  - name: orders
+    base_table:
+      schema: mart
+      table: orders_base
+    primary_key:
+      columns: [order_id]
+    dimensions:
+      - name: region
+        expr: region
+        data_type: varchar
+    time_dimensions:
+      - name: order_date
+        expr: order_date
+        data_type: date
+    facts:
+      - name: revenue
+        expr: revenue
+        data_type: double
+    metrics:
+      - name: total_revenue
+        metric_type: sum
+        expr: revenue
+      - name: order_count
+        metric_type: count
+        expr: order_id
+
+  - name: customers
+    base_table:
+      schema: mart
+      table: customers_base
+    primary_key:
+      columns: [customer_id]
+    dimensions:
+      - name: customer_segment
+        expr: customer_segment
+        data_type: varchar
+
+joins:
+  - name: orders_to_customers
+    left_table: orders
+    right_table: customers
+    join_type: left
+    join_expr: LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id
+
