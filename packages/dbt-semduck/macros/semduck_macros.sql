@@ -7,6 +7,23 @@
   {{ return(compiled.rstrip().rstrip(';')) }}
 {%- endmacro %}
 
+{% macro query(semantic_node_relation, request_suffix) -%}
+  {% if not execute %}
+    {{ return("select 1 where 1 = 0") }}
+  {% endif %}
+
+  {% set semantic_node_sql = semantic_node_relation.render() if semantic_node_relation is not string else semantic_node_relation %}
+  {% set lookup_sql = "select semantic_view_name from " ~ semantic_node_sql %}
+  {% set semantic_view_name = dbt_semduck.semduck__scalar(lookup_sql) %}
+
+  {% if semantic_view_name is none %}
+    {% do exceptions.raise_compiler_error("semantic node relation did not return a semantic_view_name: " ~ semantic_node_sql) %}
+  {% endif %}
+
+  {% set request = semantic_view_name ~ " " ~ request_suffix.strip() %}
+  {{ return(dbt_semduck.semduck_query(request)) }}
+{%- endmacro %}
+
 {% macro semduck_load_ddl(ddl_text) -%}
   {% if not execute %}
     {{ return(none) }}

@@ -26,10 +26,11 @@ table orders as {{ ref('orders') }}
 Downstream models can query a semantic request with:
 
 ```jinja
--- depends_on: {{ ref('orders_semantic') }}
-
 select *
 from (
-  {{ dbt_semduck.semduck_query("orders_semantic dimensions region metrics total_revenue") }}
+  {{ dbt_semduck.query(
+      ref('orders_semantic_node'),
+      'dimensions region metrics total_revenue'
+  ) }}
 )
 ```

@@ -1,6 +1,7 @@
--- depends_on: {{ ref('orders_semantic_node') }}
-
 select *
 from (
-  {{ dbt_semduck.semduck_query("orders_semantic dimensions region metrics total_revenue") }}
+  {{ dbt_semduck.query(
+      ref('orders_semantic_node'),
+      'dimensions region metrics total_revenue'
+  ) }}
 )
