@@ -1,4 +1,4 @@
--- depends_on: {{ ref('orders') }}
+-- depends_on: {{ ref('orders_semantic_node') }}
 
 select *
 from (

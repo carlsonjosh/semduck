@@ -8,9 +8,6 @@ model-paths:
 seed-paths:
   - seeds
 
-on-run-start:
-  - "{{ dbt_semduck.semduck_on_run_start() }}"
-
 models:
   semduck_integration:
     +materialized: table
