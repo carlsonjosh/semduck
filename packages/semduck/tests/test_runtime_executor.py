@@ -26,3 +26,21 @@ def test_execute_request_direct_join(loaded_conn):
     )
     rows = relation.fetchall()
     assert len(rows) == 3
+
+
+def test_execute_request_with_derived_metric(loaded_conn):
+    relation = execute_request(
+        loaded_conn,
+        "orders_semantic metrics total_revenue / 1000 as revenue_in_thousands",
+    )
+    rows = relation.fetchall()
+    assert rows == [(0.45,)]
+
+
+def test_execute_request_with_derived_dimension(loaded_conn):
+    relation = execute_request(
+        loaded_conn,
+        "orders_semantic dimensions region, case when region = 'US' then 'domestic' else 'intl' end as market_type metrics total_revenue",
+    )
+    rows = sorted(relation.fetchall())
+    assert rows == [("CA", "intl", 200.0), ("US", "domestic", 250.0)]

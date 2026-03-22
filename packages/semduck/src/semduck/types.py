@@ -5,10 +5,42 @@ from typing import Optional
 
 
 @dataclass
+class RequestedDimension:
+    pass
+
+
+@dataclass
+class NamedDimension(RequestedDimension):
+    name: str
+
+
+@dataclass
+class DerivedDimension(RequestedDimension):
+    expr: str
+    alias: str
+
+
+@dataclass
+class RequestedMetric:
+    pass
+
+
+@dataclass
+class NamedMetric(RequestedMetric):
+    name: str
+
+
+@dataclass
+class DerivedMetric(RequestedMetric):
+    expr: str
+    alias: str
+
+
+@dataclass
 class ParsedSemanticRequest:
     semantic_view_ref: str
-    dimensions: list[str] = field(default_factory=list)
-    metrics: list[str] = field(default_factory=list)
+    dimensions: list[RequestedDimension] = field(default_factory=list)
+    metrics: list[RequestedMetric] = field(default_factory=list)
     where_clause: Optional[str] = None
 
 
@@ -68,6 +100,18 @@ class ResolvedMetric:
 
 
 @dataclass
+class ResolvedDerivedDimension:
+    alias: str
+    expr_sql: str
+
+
+@dataclass
+class ResolvedDerivedMetric:
+    alias: str
+    expr_sql: str
+
+
+@dataclass
 class QueryPlan:
     semantic_view_ref: str
     from_table: str
@@ -75,6 +119,10 @@ class QueryPlan:
     joins: list[SemanticJoin]
     dimensions: list[ResolvedDimension]
     metrics: list[ResolvedMetric]
+    derived_dimensions: list[ResolvedDerivedDimension]
+    derived_metrics: list[ResolvedDerivedMetric]
+    output_dimensions: list[str]
+    output_metrics: list[str]
     where_clause: Optional[str]
 
 
@@ -91,4 +139,3 @@ class CompiledSemanticQuery:
     parsed_request: ParsedSemanticRequest
     plan: QueryPlan
     sql: str
-

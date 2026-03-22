@@ -57,4 +57,25 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
         sql += f"\nwhere {plan.where_clause}"
     if plan.metrics and plan.dimensions:
         sql += f"\ngroup by {', '.join(group_by_positions)}"
-    return sql + ";"
+    if not plan.derived_dimensions and not plan.derived_metrics:
+        return sql + ";"
+
+    outer_select_parts = []
+    for output_name in plan.output_dimensions:
+        derived = next((item for item in plan.derived_dimensions if item.alias == output_name), None)
+        if derived is not None:
+            outer_select_parts.append(f"{derived.expr_sql} as {derived.alias}")
+        else:
+            outer_select_parts.append(output_name)
+
+    for output_name in plan.output_metrics:
+        derived = next((item for item in plan.derived_metrics if item.alias == output_name), None)
+        if derived is not None:
+            outer_select_parts.append(f"{derived.expr_sql} as {derived.alias}")
+        else:
+            outer_select_parts.append(output_name)
+
+    outer_sql = "select\n  " + ",\n  ".join(outer_select_parts) + "\nfrom (\n"
+    outer_sql += "\n".join(f"  {line}" for line in sql.splitlines())
+    outer_sql += "\n) semduck_base"
+    return outer_sql + ";"

@@ -31,3 +31,26 @@ def test_compile_join_sql(loaded_conn):
     sql = compile_sql(plan, registry)
     assert "LEFT JOIN mart.orders_base o" not in sql
     assert "LEFT JOIN mart.customers_base c" in sql
+
+
+def test_compile_derived_metric_outer_select(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    plan = build_query_plan(
+        parse_request("orders_semantic metrics total_revenue / 1000 as revenue_in_thousands"),
+        registry,
+    )
+    sql = compile_sql(plan, registry)
+    assert "from (\n  select" in sql
+    assert "total_revenue / 1000 as revenue_in_thousands" in sql
+
+
+def test_compile_derived_dimension_outer_select(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    plan = build_query_plan(
+        parse_request(
+            "orders_semantic dimensions region, case when region = 'US' then 'domestic' else 'intl' end as market_type metrics total_revenue"
+        ),
+        registry,
+    )
+    sql = compile_sql(plan, registry)
+    assert "case when region = 'US' then 'domestic' else 'intl' end as market_type" in sql
