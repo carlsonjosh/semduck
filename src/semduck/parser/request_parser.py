@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from duckdb_semantic.errors import SemanticParseError, SemanticUnsupportedError
-from duckdb_semantic.types import ParsedSemanticRequest
+from semduck.errors import SemanticParseError, SemanticUnsupportedError
+from semduck.types import ParsedSemanticRequest
 
 SECTION_KEYWORDS = ("dimensions", "metrics", "where")
 UNSUPPORTED_PATTERNS = (r"\bhaving\b", r"\border\s+by\b", r"\blimit\b")
@@ -76,4 +76,3 @@ def parse_request(request_str: str) -> ParsedSemanticRequest:
         metrics=metrics,
         where_clause=where_clause,
     )
-

@@ -1,4 +1,4 @@
-from duckdb_semantic.api import (
+from semduck.api import (
     compile_request,
     execute_request,
     get_semantic_view,
@@ -7,7 +7,7 @@ from duckdb_semantic.api import (
     load_semantic_yaml_file,
     parse_request,
 )
-from duckdb_semantic.errors import (
+from semduck.errors import (
     SemanticCompileError,
     SemanticJoinError,
     SemanticParseError,
@@ -17,7 +17,7 @@ from duckdb_semantic.errors import (
     SemanticValidationError,
     SemanticViewError,
 )
-from duckdb_semantic.types import (
+from semduck.types import (
     CompiledSemanticQuery,
     LoadResult,
     ParsedSemanticRequest,
@@ -57,4 +57,3 @@ __all__ = [
     "load_semantic_yaml_file",
     "parse_request",
 ]
-

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from duckdb_semantic.compiler.qualifier import qualify_expr, qualify_metric_expr
-from duckdb_semantic.errors import SemanticResolutionError
-from duckdb_semantic.planner.joins import choose_anchor_table, resolve_required_joins
-from duckdb_semantic.planner.where_rewriter import rewrite_where_clause
-from duckdb_semantic.types import (
+from semduck.compiler.qualifier import qualify_expr, qualify_metric_expr
+from semduck.errors import SemanticResolutionError
+from semduck.planner.joins import choose_anchor_table, resolve_required_joins
+from semduck.planner.where_rewriter import rewrite_where_clause
+from semduck.types import (
     ParsedSemanticRequest,
     QueryPlan,
     ResolvedDimension,
@@ -97,4 +97,3 @@ def build_query_plan(parsed: ParsedSemanticRequest, registry: SemanticViewRegist
         metrics=resolved_metrics,
         where_clause=rewritten_where,
     )
-

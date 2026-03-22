@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from duckdb_semantic.errors import SemanticJoinError
-from duckdb_semantic.types import ResolvedDimension, ResolvedMetric, SemanticJoin, SemanticTable, SemanticViewRegistry
+from semduck.errors import SemanticJoinError
+from semduck.types import ResolvedDimension, ResolvedMetric, SemanticJoin, SemanticTable, SemanticViewRegistry
 
 
 def choose_anchor_table(
@@ -45,4 +45,3 @@ def resolve_required_joins(
         joins.append(match)
 
     return joins
-

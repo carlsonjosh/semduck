@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from duckdb_semantic.errors import SemanticValidationError
+from semduck.errors import SemanticValidationError
 
 
 def build_table_alias(table_name: str, used_aliases: set[str]) -> str:
@@ -123,4 +123,3 @@ def validate_semantic_spec(spec: dict[str, Any]) -> None:
             raise SemanticValidationError(f"join {join_name} missing join_type")
         if not join_spec.get("join_expr"):
             raise SemanticValidationError(f"join {join_name} missing join_expr")
-

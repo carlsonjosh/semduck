@@ -1,6 +1,6 @@
-from duckdb_semantic.errors import SemanticResolutionError
-from duckdb_semantic.planner.where_rewriter import rewrite_where_clause
-from duckdb_semantic.registry.reader import load_semantic_view_registry
+from semduck.errors import SemanticResolutionError
+from semduck.planner.where_rewriter import rewrite_where_clause
+from semduck.registry.reader import load_semantic_view_registry
 
 
 def test_rewrite_dimension_reference(loaded_conn):
@@ -23,4 +23,3 @@ def test_metric_in_where_rejected(loaded_conn):
         pass
     else:
         raise AssertionError("expected SemanticResolutionError")
-

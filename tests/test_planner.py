@@ -1,7 +1,7 @@
-from duckdb_semantic.errors import SemanticJoinError, SemanticResolutionError
-from duckdb_semantic.parser.request_parser import parse_request
-from duckdb_semantic.planner.resolver import build_query_plan
-from duckdb_semantic.registry.reader import load_semantic_view_registry
+from semduck.errors import SemanticJoinError, SemanticResolutionError
+from semduck.parser.request_parser import parse_request
+from semduck.planner.resolver import build_query_plan
+from semduck.registry.reader import load_semantic_view_registry
 
 
 def test_single_table_resolution(loaded_conn):
@@ -66,4 +66,3 @@ def test_missing_direct_join_rejected(conn):
         pass
     else:
         raise AssertionError("expected SemanticJoinError")
-

@@ -27,29 +27,6 @@ wheels = [
 ]
 
 [[package]]
-name = "duckdb-semantic"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "duckdb" },
-    { name = "pyyaml" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "duckdb" },
-    { name = "pyyaml" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest" }]
-
-[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -118,3 +95,26 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/86/bf/899e81e4cce32febab4fb42bb97dcdf66bc135272882d1987881a4b519e9/pyyaml-6.0.3-cp312-cp312-win_amd64.whl", hash = "sha256:5fcd34e47f6e0b794d17de1b4ff496c00986e1c83f7ab2fb8fcfe9616ff7477b", size = 154003 },
     { url = "https://files.pythonhosted.org/packages/1a/08/67bd04656199bbb51dbed1439b7f27601dfb576fb864099c7ef0c3e55531/pyyaml-6.0.3-cp312-cp312-win_arm64.whl", hash = "sha256:64386e5e707d03a7e172c0701abfb7e10f0fb753ee1d773128192742712a98fd", size = 140344 },
 ]
+
+[[package]]
+name = "semduck"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "duckdb" },
+    { name = "pyyaml" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "duckdb" },
+    { name = "pyyaml" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest" }]

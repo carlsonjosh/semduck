@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from duckdb_semantic.authoring.yaml_loader import load_yaml_spec
-from duckdb_semantic.parser.request_parser import parse_request as parse_semantic_request
-from duckdb_semantic.registry.reader import load_semantic_view_registry
-from duckdb_semantic.registry.schema import init_registry_schema
-from duckdb_semantic.registry.writer import write_semantic_view
-from duckdb_semantic.runtime.executor import compile_semantic_request, execute_semantic_request
-from duckdb_semantic.types import CompiledSemanticQuery, LoadResult, ParsedSemanticRequest, SemanticViewRegistry
+from semduck.authoring.yaml_loader import load_yaml_spec
+from semduck.parser.request_parser import parse_request as parse_semantic_request
+from semduck.registry.reader import load_semantic_view_registry
+from semduck.registry.schema import init_registry_schema
+from semduck.registry.writer import write_semantic_view
+from semduck.runtime.executor import compile_semantic_request, execute_semantic_request
+from semduck.types import CompiledSemanticQuery, LoadResult, ParsedSemanticRequest, SemanticViewRegistry
 
 
 def init_registry(conn: Any) -> None:
@@ -63,4 +63,3 @@ def compile_request(conn: Any, request: str) -> CompiledSemanticQuery:
 
 def execute_request(conn: Any, request: str):
     return execute_semantic_request(conn, request)
-

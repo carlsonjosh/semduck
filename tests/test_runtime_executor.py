@@ -1,4 +1,4 @@
-from duckdb_semantic import compile_request, execute_request
+from semduck import compile_request, execute_request
 
 
 def test_compile_request(loaded_conn):

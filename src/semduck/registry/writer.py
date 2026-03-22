@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from duckdb_semantic.authoring.validators import build_table_alias
-from duckdb_semantic.errors import SemanticRegistryError
-from duckdb_semantic.types import LoadResult
+from semduck.authoring.validators import build_table_alias
+from semduck.errors import SemanticRegistryError
+from semduck.types import LoadResult
 
 
 def _primary_key_columns(table_spec: dict[str, Any]) -> str | None:
@@ -169,4 +169,3 @@ def write_semantic_view(
         if isinstance(exc, SemanticRegistryError):
             raise
         raise SemanticRegistryError(str(exc)) from exc
-

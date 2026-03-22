@@ -1,5 +1,5 @@
-from duckdb_semantic import load_semantic_yaml
-from duckdb_semantic.errors import SemanticValidationError
+from semduck import load_semantic_yaml
+from semduck.errors import SemanticValidationError
 
 
 VALID_YAML = """
@@ -81,4 +81,3 @@ joins:
         pass
     else:
         raise AssertionError("expected SemanticValidationError")
-

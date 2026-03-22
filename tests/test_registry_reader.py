@@ -1,4 +1,4 @@
-from duckdb_semantic import get_semantic_view, load_semantic_yaml
+from semduck import get_semantic_view, load_semantic_yaml
 
 
 VALID_YAML = """
@@ -47,4 +47,3 @@ tables:
     registry = get_semantic_view(conn, "sample")
     assert "country" in registry.tables["orders"].dimensions
     assert "region" not in registry.tables["orders"].dimensions
-

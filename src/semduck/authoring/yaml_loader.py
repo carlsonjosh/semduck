@@ -4,8 +4,8 @@ from typing import Any
 
 import yaml
 
-from duckdb_semantic.authoring.validators import validate_semantic_spec
-from duckdb_semantic.errors import SemanticValidationError
+from semduck.authoring.validators import validate_semantic_spec
+from semduck.errors import SemanticValidationError
 
 
 def load_yaml_spec(yaml_text: str) -> dict[str, Any]:
@@ -14,4 +14,3 @@ def load_yaml_spec(yaml_text: str) -> dict[str, Any]:
         raise SemanticValidationError("YAML must define a mapping at the top level")
     validate_semantic_spec(spec)
     return spec
-

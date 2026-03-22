@@ -1,5 +1,5 @@
-from duckdb_semantic.errors import SemanticParseError, SemanticUnsupportedError
-from duckdb_semantic.parser.request_parser import parse_request
+from semduck.errors import SemanticParseError, SemanticUnsupportedError
+from semduck.parser.request_parser import parse_request
 
 
 def test_parse_name_only():
@@ -45,4 +45,3 @@ def test_parse_unsupported_clause():
         pass
     else:
         raise AssertionError("expected SemanticUnsupportedError")
-

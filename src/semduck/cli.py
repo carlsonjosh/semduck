@@ -5,15 +5,15 @@ import sys
 
 import duckdb
 
-from duckdb_semantic.api import compile_request, init_registry, load_semantic_yaml_file
-from duckdb_semantic.errors import SemanticViewError
+from semduck.api import compile_request, init_registry, load_semantic_yaml_file
+from semduck.errors import SemanticViewError
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="duckdb-semantic")
+    parser = argparse.ArgumentParser(prog="semduck")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_cmd = subparsers.add_parser("init-registry")
+    init_cmd = subparsers.add_parser("init")
     init_cmd.add_argument("--db", required=True)
 
     validate_cmd = subparsers.add_parser("validate-yaml")
@@ -46,9 +46,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         with _connect(args.db) as conn:
-            if args.command == "init-registry":
+            if args.command == "init":
                 init_registry(conn)
-                print("ok init-registry")
+                print("ok init")
                 return 0
 
             if args.command == "validate-yaml":
@@ -86,4 +86,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

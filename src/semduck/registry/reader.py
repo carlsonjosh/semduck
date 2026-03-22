@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from duckdb_semantic.errors import SemanticRegistryError
-from duckdb_semantic.types import SemanticJoin, SemanticObject, SemanticTable, SemanticViewRegistry
+from semduck.errors import SemanticRegistryError
+from semduck.types import SemanticJoin, SemanticObject, SemanticTable, SemanticViewRegistry
 
 
 def load_semantic_view_registry(conn: Any, semantic_view_ref: str) -> SemanticViewRegistry:
@@ -116,4 +116,3 @@ def load_semantic_view_registry(conn: Any, semantic_view_ref: str) -> SemanticVi
     ]
 
     return SemanticViewRegistry(view_name=semantic_view_ref, tables=tables, joins=joins)
-

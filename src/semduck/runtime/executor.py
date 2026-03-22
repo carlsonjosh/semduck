@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from duckdb_semantic.compiler.sql_compiler import compile_sql
-from duckdb_semantic.parser.request_parser import parse_request
-from duckdb_semantic.planner.resolver import build_query_plan
-from duckdb_semantic.registry.reader import load_semantic_view_registry
-from duckdb_semantic.types import CompiledSemanticQuery
+from semduck.compiler.sql_compiler import compile_sql
+from semduck.parser.request_parser import parse_request
+from semduck.planner.resolver import build_query_plan
+from semduck.registry.reader import load_semantic_view_registry
+from semduck.types import CompiledSemanticQuery
 
 
 def compile_semantic_request(conn: Any, request: str) -> CompiledSemanticQuery:
@@ -25,4 +25,3 @@ def compile_semantic_request(conn: Any, request: str) -> CompiledSemanticQuery:
 def execute_semantic_request(conn: Any, request: str):
     compiled = compile_semantic_request(conn, request)
     return conn.sql(compiled.sql)
-

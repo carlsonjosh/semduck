@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from duckdb_semantic.types import QueryPlan, SemanticViewRegistry
+from semduck.types import QueryPlan, SemanticViewRegistry
 
 
 def fully_qualified_table(physical_schema: str | None, physical_table: str) -> str:
@@ -58,4 +58,3 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
     if plan.metrics and plan.dimensions:
         sql += f"\ngroup by {', '.join(group_by_positions)}"
     return sql + ";"
-

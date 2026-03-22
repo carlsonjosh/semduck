@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from duckdb_semantic.types import SemanticObject
+from semduck.types import SemanticObject
 
 SQL_KEYWORDS = {
     "case",

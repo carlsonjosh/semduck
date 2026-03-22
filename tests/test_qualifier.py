@@ -1,5 +1,5 @@
-from duckdb_semantic.compiler.qualifier import qualify_expr, qualify_metric_expr
-from duckdb_semantic.types import SemanticObject
+from semduck.compiler.qualifier import qualify_expr, qualify_metric_expr
+from semduck.types import SemanticObject
 
 
 def test_qualify_bare_identifier():
@@ -23,4 +23,3 @@ def test_preserve_string_literals():
     assert qualify_expr("case when region = 'US' then revenue else 0 end", "o") == (
         "case when o.region = 'US' then o.revenue else 0 end"
     )
-

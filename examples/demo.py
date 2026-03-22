@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import duckdb
 
-from duckdb_semantic import compile_request, init_registry, load_semantic_yaml_file
+from semduck import compile_request, init_registry, load_semantic_yaml_file
 
 
 def main() -> None:
@@ -39,4 +39,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

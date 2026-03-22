@@ -5,7 +5,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from duckdb_semantic import init_registry, load_semantic_yaml_file
+from semduck import init_registry, load_semantic_yaml_file
 
 
 @pytest.fixture
@@ -61,4 +61,3 @@ def loaded_conn(conn, orders_yaml_path):
     )
     load_semantic_yaml_file(conn, str(orders_yaml_path))
     return conn
-

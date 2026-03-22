@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 
-from duckdb_semantic.compiler.qualifier import qualify_expr
-from duckdb_semantic.errors import SemanticResolutionError
-from duckdb_semantic.types import SemanticViewRegistry
+from semduck.compiler.qualifier import qualify_expr
+from semduck.errors import SemanticResolutionError
+from semduck.types import SemanticViewRegistry
 
 
 def build_name_lookup(registry: SemanticViewRegistry) -> dict[str, str]:
@@ -43,4 +43,3 @@ def rewrite_where_clause(where_clause: str, registry: SemanticViewRegistry) -> s
     for name in sorted(lookup.keys(), key=len, reverse=True):
         rewritten = re.sub(rf"\b{re.escape(name)}\b", lookup[name], rewritten)
     return rewritten
-
