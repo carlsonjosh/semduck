@@ -1,6 +1,6 @@
 # dbt-semduck
 
-dbt package for loading semduck semantic YAML files in `dbt-duckdb` projects.
+dbt package for registering and querying semduck semantic views in `dbt-duckdb` projects.
 
 ## Usage
 
@@ -9,8 +9,6 @@ Add the package to `packages.yml` and configure the `semduck.dbt.plugin` plugin 
 Create an explicit semantic registration model using the `semduck_semantic` materialization:
 
 ```jinja
--- depends_on: {{ ref('orders') }}
-
 {{ config(materialized='semduck_semantic') }}
 
 create semantic view orders_semantic as

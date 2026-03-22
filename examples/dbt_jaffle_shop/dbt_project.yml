@@ -1,0 +1,13 @@
+name: dbt_semduck_jaffle_shop
+version: 0.1.0
+config-version: 2
+profile: dbt_semduck_jaffle_shop
+
+model-paths:
+  - models
+seed-paths:
+  - seeds
+
+models:
+  dbt_semduck_jaffle_shop:
+    +materialized: table
