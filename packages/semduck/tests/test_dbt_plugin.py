@@ -1,6 +1,6 @@
 import json
 
-from semduck import compile_request_sql, load_semantic_spec, register_connection
+from semduck import compile_request_sql, load_semantic_ddl, load_semantic_spec, register_connection
 
 
 VALID_SPEC = {
@@ -38,3 +38,22 @@ def test_compile_request_sql_returns_sql(loaded_conn):
     )
     assert "select" in sql.lower()
     assert "mart.orders_base" in sql
+
+
+def test_register_connection_registers_ddl_udfs(conn):
+    register_connection(conn)
+    ddl_text = """
+create semantic view sample as
+table orders as mart.orders_base
+  dimensions (
+    region as region
+  )
+  metrics (
+    order_count as count(order_id)
+  );
+"""
+    ddl_sql = ddl_text.replace("'", "''")
+    status = conn.sql(
+        f"select semduck_check_ddl('{ddl_sql}') as status"
+    ).fetchone()[0]
+    assert status == "ok check view_name=sample"

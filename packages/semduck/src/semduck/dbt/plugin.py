@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from semduck.api import check_semantic_spec, compile_request_sql, init_registry, load_semantic_spec
+from semduck.api import (
+    check_semantic_spec,
+    compile_request_sql,
+    init_registry,
+    load_semantic_ddl,
+    load_semantic_spec,
+)
 from semduck.dbt.resolver import load_unresolved_dbt_spec, relation_map_from_json, resolve_dbt_spec
 
 try:
@@ -38,6 +44,16 @@ def _load_resolved_spec(conn: Any, spec_json: str) -> str:
     return f"ok load view_name={result.view_name}"
 
 
+def _check_ddl(ddl_text: str) -> str:
+    result = load_semantic_ddl(None, ddl_text, validate_only=True)  # type: ignore[arg-type]
+    return f"ok check view_name={result.view_name}"
+
+
+def _load_ddl(conn: Any, ddl_text: str) -> str:
+    result = load_semantic_ddl(conn, ddl_text)
+    return f"ok load view_name={result.view_name}"
+
+
 def _check_yaml_file(path: str, relation_map_json: str) -> str:
     spec = resolve_dbt_spec(load_unresolved_dbt_spec(path), relation_map_from_json(relation_map_json))
     result = check_semantic_spec(None, spec)  # type: ignore[arg-type]
@@ -65,6 +81,19 @@ def register_plugin_functions(conn: Any) -> None:
     conn.create_function(
         "semduck_load_resolved_spec",
         lambda spec_json: _load_resolved_spec(conn, spec_json),
+        [str],
+        str,
+        side_effects=True,
+    )
+    conn.create_function(
+        "semduck_check_ddl",
+        lambda ddl_text: _check_ddl(ddl_text),
+        [str],
+        str,
+    )
+    conn.create_function(
+        "semduck_load_ddl",
+        lambda ddl_text: _load_ddl(conn, ddl_text),
         [str],
         str,
         side_effects=True,

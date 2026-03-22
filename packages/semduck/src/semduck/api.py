@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from semduck.authoring.ddl_loader import load_ddl_spec
 from semduck.authoring.yaml_loader import load_yaml_spec
 from semduck.parser.request_parser import parse_request as parse_semantic_request
 from semduck.registry.reader import load_semantic_view_registry
@@ -56,6 +57,23 @@ def load_semantic_yaml(
     )
 
 
+def load_semantic_ddl(
+    conn: Any,
+    ddl_text: str,
+    *,
+    replace_existing: bool = True,
+    validate_only: bool = False,
+) -> LoadResult:
+    spec = load_ddl_spec(ddl_text)
+    return load_semantic_spec(
+        conn,
+        spec,
+        replace_existing=replace_existing,
+        validate_only=validate_only,
+        source_yaml=ddl_text,
+    )
+
+
 def load_semantic_yaml_file(
     conn: Any,
     path: str,
@@ -67,6 +85,22 @@ def load_semantic_yaml_file(
     return load_semantic_yaml(
         conn,
         yaml_text,
+        replace_existing=replace_existing,
+        validate_only=validate_only,
+    )
+
+
+def load_semantic_ddl_file(
+    conn: Any,
+    path: str,
+    *,
+    replace_existing: bool = True,
+    validate_only: bool = False,
+) -> LoadResult:
+    ddl_text = Path(path).read_text(encoding="utf-8")
+    return load_semantic_ddl(
+        conn,
+        ddl_text,
         replace_existing=replace_existing,
         validate_only=validate_only,
     )

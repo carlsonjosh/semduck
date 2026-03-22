@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 import duckdb
 
-from semduck.api import compile_request, init_registry, load_semantic_yaml_file
+from semduck.api import compile_request, init_registry, load_semantic_ddl_file, load_semantic_yaml_file
 from semduck.errors import SemanticViewError
 
 
@@ -19,11 +20,13 @@ def build_parser() -> argparse.ArgumentParser:
     check_cmd = subparsers.add_parser("check")
     check_cmd.add_argument("--db", required=True)
     check_cmd.add_argument("--file", required=True)
+    check_cmd.add_argument("--format", choices=["auto", "yaml", "ddl"], default="auto")
 
     load_cmd = subparsers.add_parser("load")
     load_cmd.add_argument("--db", required=True)
     load_cmd.add_argument("--file", required=True)
     load_cmd.add_argument("--no-replace", action="store_true")
+    load_cmd.add_argument("--format", choices=["auto", "yaml", "ddl"], default="auto")
 
     compile_cmd = subparsers.add_parser("compile")
     compile_cmd.add_argument("--db", required=True)
@@ -40,6 +43,23 @@ def _connect(path: str):
     return duckdb.connect(path)
 
 
+def _infer_definition_format(path: str, explicit_format: str) -> str:
+    if explicit_format != "auto":
+        return explicit_format
+
+    suffix = Path(path).suffix.lower()
+    if suffix in {".yaml", ".yml"}:
+        return "yaml"
+    if suffix in {".sql", ".ddl"}:
+        return "ddl"
+
+    text = Path(path).read_text(encoding="utf-8")
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    if first_line.lower().startswith("create semantic view"):
+        return "ddl"
+    return "yaml"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -53,13 +73,17 @@ def main(argv: list[str] | None = None) -> int:
 
             if args.command == "check":
                 init_registry(conn)
-                result = load_semantic_yaml_file(conn, args.file, validate_only=True)
+                inferred_format = _infer_definition_format(args.file, args.format)
+                loader = load_semantic_ddl_file if inferred_format == "ddl" else load_semantic_yaml_file
+                result = loader(conn, args.file, validate_only=True)
                 print(f"ok check view_name={result.view_name}")
                 return 0
 
             if args.command == "load":
                 init_registry(conn)
-                result = load_semantic_yaml_file(
+                inferred_format = _infer_definition_format(args.file, args.format)
+                loader = load_semantic_ddl_file if inferred_format == "ddl" else load_semantic_yaml_file
+                result = loader(
                     conn,
                     args.file,
                     replace_existing=not args.no_replace,

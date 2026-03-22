@@ -1,8 +1,12 @@
 -- depends_on: {{ ref('orders') }}
 
-{{ config(
-    materialized='semduck_semantic',
-    semduck_spec='semantic_specs/custom_orders_definition.yml'
-) }}
+{{ config(materialized='semduck_semantic') }}
 
-select 'orders_semantic' as semantic_view_name
+create semantic view orders_semantic as
+table orders as {{ ref('orders') }}
+  dimensions (
+    region as region type varchar
+  )
+  metrics (
+    total_revenue as sum(revenue)
+  );

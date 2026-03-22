@@ -20,7 +20,7 @@
 
 {% macro semduck__spec_path(configured_path) -%}
   {% if configured_path is none %}
-    {% do exceptions.raise_compiler_error("semduck_spec config is required for semduck_semantic materialization") %}
+    {% do exceptions.raise_compiler_error("semduck_spec config is required when semduck_semantic is not using inline DDL") %}
   {% endif %}
   {{ return(configured_path) }}
 {%- endmacro %}

@@ -1,8 +1,12 @@
 -- depends_on: {{ source('raw', 'orders_seed') }}
 
-{{ config(
-    materialized='semduck_semantic',
-    semduck_spec='semantic_configs/raw_orders_metrics.yaml'
-) }}
+{{ config(materialized='semduck_semantic') }}
 
-select 'raw_orders_semantic' as semantic_view_name
+create semantic view raw_orders_semantic as
+table raw_orders as {{ source('raw', 'orders_seed') }}
+  dimensions (
+    region as region
+  )
+  metrics (
+    total_revenue as sum(revenue)
+  );

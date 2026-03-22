@@ -11,13 +11,19 @@ Create an explicit semantic registration model using the `semduck_semantic` mate
 ```jinja
 -- depends_on: {{ ref('orders') }}
 
-{{ config(
-    materialized='semduck_semantic',
-    semduck_spec='semantic_specs/orders_metrics.yml'
-) }}
+{{ config(materialized='semduck_semantic') }}
 
-select 'orders_semantic' as semantic_view_name
+create semantic view orders_semantic as
+table orders as {{ ref('orders') }}
+  dimensions (
+    region as region
+  )
+  metrics (
+    total_revenue as sum(revenue)
+  );
 ```
+
+If you still want file-based specs, `semduck_spec='path/to/spec.yml'` remains supported as a fallback.
 
 Downstream models can query a semantic request with:
 
