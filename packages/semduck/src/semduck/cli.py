@@ -98,7 +98,11 @@ def main(argv: list[str] | None = None) -> int:
 
             if args.command == "query":
                 relation = conn.sql(compile_request(conn, args.request).sql)
-                print(relation.df().to_string(index=False))
+                columns = [column[0] for column in relation.description]
+                rows = relation.fetchall()
+                print(" | ".join(columns))
+                for row in rows:
+                    print(" | ".join("" if value is None else str(value) for value in row))
                 return 0
     except SemanticViewError as exc:
         print(f"error: {exc}", file=sys.stderr)

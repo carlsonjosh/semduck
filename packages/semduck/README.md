@@ -11,6 +11,18 @@ uv run semduck load --db demo.duckdb --file examples/orders_semantic.yaml
 uv run semduck compile --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
 ```
 
+To query the existing dbt example database in this repo:
+
+```bash
+uv run python packages/semduck/examples/query_existing_db.py
+```
+
+To do the same thing through the CLI:
+
+```bash
+bash packages/semduck/examples/query_existing_db_cli.sh
+```
+
 ## YAML Shape
 
 Semantic YAML files must be a top-level mapping with:
