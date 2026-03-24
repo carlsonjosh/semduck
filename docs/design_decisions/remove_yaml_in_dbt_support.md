@@ -45,7 +45,8 @@ That means `semduck` must not depend on unresolved dbt constructs such as:
 This keeps the architecture clean:
 
 - `semduck` remains dbt-agnostic
-- `dbt-semduck` owns dbt integration concerns
+- `semduck` owns the Python-side DuckDB integration surface, but not dbt parsing
+- `dbt-semduck` owns dbt-facing macros, materializations, and relation resolution before handoff
 - inline DDL in dbt is natural because dbt already compiles SQL before execution
 - the runtime registry only stores concrete physical relations
 
@@ -63,6 +64,7 @@ Current supported flows are:
 - standalone `semduck`:
   - YAML
   - DDL
+- Python-side DuckDB integration through the `semduck` plugin surface
 - `dbt-semduck`:
   - inline semantic DDL only
 

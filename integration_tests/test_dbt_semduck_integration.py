@@ -8,7 +8,7 @@ import duckdb
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PROJECT_DIR = REPO_ROOT / "integration_tests" / "dbt_project"
+PROJECT_DIR = REPO_ROOT / "examples" / "test_fixtures" / "dbt_project"
 SEMDUCK_SRC = REPO_ROOT / "packages" / "semduck" / "src"
 
 
