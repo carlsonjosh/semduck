@@ -2,6 +2,18 @@
 
 Portable semantic view runtime for DuckDB, implemented in Python.
 
+## Install
+
+```bash
+pip install semduck
+```
+
+Install the dbt integration dependency only if you are registering the DuckDB plugin in a `dbt-duckdb` project:
+
+```bash
+pip install "semduck[dbt]"
+```
+
 ## Supported Patterns
 
 - Standalone Python package and CLI:
@@ -18,22 +30,21 @@ Start by initializing a registry. This creates a semantic schema and several sup
 the duckdb database you provide. 
 
 ```bash
-uv sync
-uv run semduck init --db demo.duckdb
+semduck init --db demo.duckdb
 ```
 
 Load a semantic definition from YAML:
 
 ```bash
-uv run semduck load --db demo.duckdb --file packages/semduck/examples/orders_semantic.yaml
-uv run semduck compile --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
+semduck load --db demo.duckdb --file orders_semantic.yaml
+semduck compile --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
 ```
 
 Load a semantic definition from DDL:
 
 ```bash
-uv run semduck load --db demo.duckdb --format ddl --file path/to/orders_semantic.sql
-uv run semduck query --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
+semduck load --db demo.duckdb --format ddl --file path/to/orders_semantic.sql
+semduck query --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
 ```
 
 The CLI accepts `--format auto|yaml|ddl` for `check` and `load`. In `auto` mode it uses the file extension or the first non-empty line to infer the format.
@@ -61,7 +72,7 @@ tables:
         expr: order_id
 ```
 
-More complete example: [packages/semduck/examples/orders_semantic.yaml](/Users/joshuacarlson/repos/semduck/packages/semduck/examples/orders_semantic.yaml)
+More complete example: [`examples/orders_semantic.yaml`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/orders_semantic.yaml)
 
 Validation rules enforced by the loader:
 
@@ -96,8 +107,8 @@ table orders as main.orders
 
 Repo examples:
 
-- Standalone / parser shape: [examples/dbt_jaffle_shop/models/sev_orders.sql](/Users/joshuacarlson/repos/semduck/examples/dbt_jaffle_shop/models/sev_orders.sql)
-- dbt materialization usage: [packages/dbt-semduck/README.md](/Users/joshuacarlson/repos/semduck/packages/dbt-semduck/README.md)
+- Standalone / parser shape: [`examples/dbt_jaffle_shop/models/sev_orders.sql`](https://github.com/carlsonjosh/semduck/blob/main/examples/dbt_jaffle_shop/models/sev_orders.sql)
+- dbt materialization usage: [`packages/dbt-semduck/README.md`](https://github.com/carlsonjosh/semduck/blob/main/packages/dbt-semduck/README.md)
 
 ## Python API
 
@@ -157,13 +168,14 @@ Relevant API entry points:
 - Supported in dbt: inline semantic DDL compiled by dbt and then loaded into `semduck`
 - Not supported in dbt: YAML specs containing unresolved `ref(...)` or `source(...)`
 
-The design note for that boundary is in [docs/design_decisions/remove_yaml_in_dbt_support.md](/Users/joshuacarlson/repos/semduck/docs/design_decisions/remove_yaml_in_dbt_support.md).
+The design note for that boundary is in [`docs/design_decisions/remove_yaml_in_dbt_support.md`](https://github.com/carlsonjosh/semduck/blob/main/docs/design_decisions/remove_yaml_in_dbt_support.md).
 
 ## Repo Examples
 
-- Query an existing database from Python: [packages/semduck/examples/query_existing_db.py](/Users/joshuacarlson/repos/semduck/packages/semduck/examples/query_existing_db.py)
-- Query an existing database from the CLI: [packages/semduck/examples/query_existing_db_cli.sh](/Users/joshuacarlson/repos/semduck/packages/semduck/examples/query_existing_db_cli.sh)
-- End-to-end dbt example: [examples/dbt_jaffle_shop](/Users/joshuacarlson/repos/semduck/examples/dbt_jaffle_shop)
+- In-memory Python quickstart: [`examples/quickstart.py`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/quickstart.py)
+- Query an existing database from Python: [`examples/query_existing_db.py`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/query_existing_db.py)
+- Query an existing database from the CLI: [`examples/query_existing_db_cli.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/query_existing_db_cli.sh)
+- End-to-end dbt example: [`examples/dbt_example`](https://github.com/carlsonjosh/semduck/tree/main/examples/dbt_example)
 
 ## Development
 

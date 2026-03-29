@@ -1,6 +1,7 @@
 import json
 
 from semduck import compile_request_sql, load_semantic_ddl, load_semantic_spec, register_connection
+from semduck.errors import SemanticValidationError
 
 
 VALID_SPEC = {
@@ -22,6 +23,26 @@ def test_load_semantic_spec_validate_only(conn):
     assert result.validated_only is True
 
 
+def test_load_semantic_spec_validate_only_rejects_invalid_spec(conn):
+    invalid_spec = {
+        "name": "sample",
+        "tables": [
+            {
+                "name": "orders",
+                "base_table": {"table": "orders_base"},
+                "dimensions": [{"name": "region"}],
+            }
+        ],
+    }
+
+    try:
+        load_semantic_spec(conn, invalid_spec, validate_only=True)
+    except SemanticValidationError:
+        pass
+    else:
+        raise AssertionError("expected SemanticValidationError")
+
+
 def test_register_connection_registers_udfs(conn):
     register_connection(conn)
     spec_json = json.dumps(VALID_SPEC).replace("'", "''")
@@ -30,6 +51,31 @@ def test_register_connection_registers_udfs(conn):
         f"select semduck_check_resolved_spec('{spec_json}') as status"
     ).fetchone()[0]
     assert check_result == "ok check view_name=sample"
+
+
+def test_register_connection_rejects_invalid_resolved_spec(conn):
+    register_connection(conn)
+    invalid_spec_json = json.dumps(
+        {
+            "name": "sample",
+            "tables": [
+                {
+                    "name": "orders",
+                    "base_table": {"table": "orders_base"},
+                    "dimensions": [{"name": "region"}],
+                }
+            ],
+        }
+    ).replace("'", "''")
+
+    try:
+        conn.sql(
+            f"select semduck_check_resolved_spec('{invalid_spec_json}') as status"
+        ).fetchone()[0]
+    except Exception as exc:
+        assert "missing expr" in str(exc)
+    else:
+        raise AssertionError("expected invalid resolved spec to fail validation")
 
 
 def test_compile_request_sql_returns_sql(loaded_conn):

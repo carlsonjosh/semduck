@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from semduck.authoring.ddl_loader import load_ddl_spec
+from semduck.authoring.validators import validate_semantic_spec
 from semduck.authoring.yaml_loader import load_yaml_spec
 from semduck.parser.request_parser import parse_request as parse_semantic_request
 from semduck.registry.reader import load_semantic_view_registry
@@ -26,6 +27,7 @@ def load_semantic_spec(
     validate_only: bool = False,
     source_yaml: str | None = None,
 ) -> LoadResult:
+    validate_semantic_spec(spec)
     source = source_yaml or json.dumps(spec, sort_keys=True)
     return write_semantic_view(
         conn,

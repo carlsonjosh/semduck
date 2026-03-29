@@ -1,4 +1,0 @@
-packages:
-  - local: ../../packages/dbt-semduck
-    name: dbt_semduck
-sha1_hash: aaf180d5a07d31b0dc93c16aa0e42cf067f9d315

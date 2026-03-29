@@ -1,0 +1,20 @@
+dbt_semduck_jaffle_shop:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "jaffle_shop.duckdb"
+      threads: 1
+      module_paths:
+        - "../../packages/semduck/src"
+      plugins:
+        - module: semduck.dbt.plugin
+
+    test:
+      type: duckdb
+      path: memory
+      threads: 1
+      module_paths:
+        - "../../packages/semduck/src"
+      plugins:
+        - module: semduck.dbt.plugin
