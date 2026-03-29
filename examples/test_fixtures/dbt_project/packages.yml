@@ -1,2 +1,2 @@
 packages:
-  - local: ../../packages/dbt-semduck
+  - local: ../../../packages/dbt-semduck

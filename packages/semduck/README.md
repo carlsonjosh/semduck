@@ -2,80 +2,47 @@
 
 Portable semantic view runtime for DuckDB, implemented in Python.
 
+## Supported Patterns
+
+- Standalone Python package and CLI:
+  - YAML semantic specs
+  - semantic DDL
+- dbt integration through `dbt-semduck`:
+  - inline semantic DDL only
+
+YAML support is still available in the Python package and CLI. The dbt integration deliberately uses DDL instead of YAML-in-dbt so `semduck` stays dbt-agnostic.
+
 ## Quickstart
+
+Start by initializing a registry. This creates a semantic schema and several supporting tables in 
+the duckdb database you provide. 
 
 ```bash
 uv sync
 uv run semduck init --db demo.duckdb
-uv run semduck load --db demo.duckdb --file examples/orders_semantic.yaml
+```
+
+Load a semantic definition from YAML:
+
+```bash
+uv run semduck load --db demo.duckdb --file packages/semduck/examples/orders_semantic.yaml
 uv run semduck compile --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
 ```
 
-To query the existing dbt example database in this repo:
+Load a semantic definition from DDL:
 
 ```bash
-uv run python packages/semduck/examples/query_existing_db.py
+uv run semduck load --db demo.duckdb --format ddl --file path/to/orders_semantic.sql
+uv run semduck query --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
 ```
 
-To do the same thing through the CLI:
+The CLI accepts `--format auto|yaml|ddl` for `check` and `load`. In `auto` mode it uses the file extension or the first non-empty line to infer the format.
 
-```bash
-bash packages/semduck/examples/query_existing_db_cli.sh
-```
+## Authoring Formats
 
-## YAML Shape
+### YAML
 
-Semantic YAML files must be a top-level mapping with:
-
-- `name`: required semantic view name
-- `tables`: required non-empty list of table definitions
-- `description`: optional view description
-- `joins`: optional list of joins between declared tables
-
-Each table must include:
-
-- `name`: required logical table name
-- `base_table.table`: required physical table name
-
-Optional table fields:
-
-- `base_table.schema`
-- `description`
-- `primary_key.columns`
-- `dimensions`
-- `time_dimensions`
-- `facts`
-- `metrics`
-
-`dimensions`, `time_dimensions`, and `facts` are lists of objects shaped like:
-
-```yaml
-- name: object_name
-  expr: sql_expression
-  data_type: optional_type
-  description: optional_description
-```
-
-`metrics` are shaped like:
-
-```yaml
-- name: metric_name
-  metric_type: sum
-  expr: sql_expression
-  default_agg: optional_default_agg
-  description: optional_description
-```
-
-`joins` are shaped like:
-
-```yaml
-- name: join_name
-  left_table: declared_left_table
-  right_table: declared_right_table
-  join_type: left
-  join_expr: LEFT_TABLE.id = RIGHT_TABLE.id
-  description: optional_description
-```
+The standalone YAML shape is still supported for Python and CLI usage.
 
 Minimal valid YAML:
 
@@ -94,59 +61,7 @@ tables:
         expr: order_id
 ```
 
-More complete valid YAML:
-
-```yaml
-name: orders_semantic
-description: Orders analytics semantic view
-
-tables:
-  - name: orders
-    description: Order grain table
-    base_table:
-      schema: mart
-      table: orders_base
-    primary_key:
-      columns: [order_id]
-    dimensions:
-      - name: region
-        expr: region
-        data_type: varchar
-        description: Sales region
-    time_dimensions:
-      - name: order_date
-        expr: order_date
-        data_type: date
-    facts:
-      - name: revenue
-        expr: revenue
-        data_type: double
-    metrics:
-      - name: total_revenue
-        metric_type: sum
-        expr: revenue
-      - name: order_count
-        metric_type: count
-        expr: order_id
-
-  - name: customers
-    base_table:
-      schema: mart
-      table: customers_base
-    primary_key:
-      columns: [customer_id]
-    dimensions:
-      - name: customer_segment
-        expr: customer_segment
-        data_type: varchar
-
-joins:
-  - name: orders_to_customers
-    left_table: orders
-    right_table: customers
-    join_type: left
-    join_expr: LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id
-```
+More complete example: [packages/semduck/examples/orders_semantic.yaml](/Users/joshuacarlson/repos/semduck/packages/semduck/examples/orders_semantic.yaml)
 
 Validation rules enforced by the loader:
 
@@ -159,6 +74,96 @@ Validation rules enforced by the loader:
 - `dimensions`, `time_dimensions`, and `facts` entries require `name` and `expr`
 - `metrics` entries require `name`, `metric_type`, and `expr`
 - joins must reference declared tables and require `name`, `left_table`, `right_table`, `join_type`, and `join_expr`
+
+### DDL
+
+Semantic DDL is supported in the Python package, CLI, and dbt integration.
+
+Example:
+
+```sql
+create semantic view orders_semantic as
+table orders as main.orders
+  primary key (order_id)
+  dimensions (
+    region as region
+  )
+  metrics (
+    total_revenue as sum(revenue),
+    order_count as count(order_id)
+  );
+```
+
+Repo examples:
+
+- Standalone / parser shape: [examples/dbt_jaffle_shop/models/sev_orders.sql](/Users/joshuacarlson/repos/semduck/examples/dbt_jaffle_shop/models/sev_orders.sql)
+- dbt materialization usage: [packages/dbt-semduck/README.md](/Users/joshuacarlson/repos/semduck/packages/dbt-semduck/README.md)
+
+## Python API
+
+The package exposes both YAML and DDL loaders:
+
+```python
+import duckdb
+from semduck import compile_request_sql, init_registry, load_semantic_ddl, load_semantic_yaml
+
+conn = duckdb.connect("demo.duckdb")
+init_registry(conn)
+
+load_semantic_yaml(conn, """
+name: sample
+tables:
+  - name: orders
+    base_table:
+      table: orders
+    dimensions:
+      - name: region
+        expr: region
+    metrics:
+      - name: order_count
+        metric_type: count
+        expr: order_id
+""")
+
+load_semantic_ddl(conn, """
+create semantic view replacement_sample as
+table orders as main.orders
+  dimensions (
+    region as region
+  )
+  metrics (
+    order_count as count(order_id)
+  );
+""")
+
+sql = compile_request_sql(conn, "replacement_sample dimensions region metrics order_count")
+print(sql)
+```
+
+Relevant API entry points:
+
+- `init_registry(conn)`
+- `load_semantic_yaml(conn, yaml_text)`
+- `load_semantic_ddl(conn, ddl_text)`
+- `load_semantic_yaml_file(conn, path)`
+- `load_semantic_ddl_file(conn, path)`
+- `compile_request_sql(conn, request)`
+- `execute_request(conn, request)`
+
+## dbt Boundary
+
+`semduck` keeps dbt-specific behavior in the `dbt-semduck` package.
+
+- Supported in dbt: inline semantic DDL compiled by dbt and then loaded into `semduck`
+- Not supported in dbt: YAML specs containing unresolved `ref(...)` or `source(...)`
+
+The design note for that boundary is in [docs/design_decisions/remove_yaml_in_dbt_support.md](/Users/joshuacarlson/repos/semduck/docs/design_decisions/remove_yaml_in_dbt_support.md).
+
+## Repo Examples
+
+- Query an existing database from Python: [packages/semduck/examples/query_existing_db.py](/Users/joshuacarlson/repos/semduck/packages/semduck/examples/query_existing_db.py)
+- Query an existing database from the CLI: [packages/semduck/examples/query_existing_db_cli.sh](/Users/joshuacarlson/repos/semduck/packages/semduck/examples/query_existing_db_cli.sh)
+- End-to-end dbt example: [examples/dbt_jaffle_shop](/Users/joshuacarlson/repos/semduck/examples/dbt_jaffle_shop)
 
 ## Development
 

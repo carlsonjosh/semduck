@@ -6,8 +6,9 @@ This is a small dbt-duckdb example showing how to define and query a semantic vi
 
 - `seeds/customers.csv` and `seeds/orders.csv`: source data
 - `models/fct_orders.sql` and `models/dim_customers.sql`: dbt models
-- `models/orders_semantic_node.sql`: semantic DDL model using `semduck_semantic`
-- `models/customer_revenue_report.sql`: downstream semantic query model
+- `models/sev_orders.sql`: semantic DDL model using `semduck_semantic`
+- `models/rpt_customer_revenue.sql`: downstream semantic query model using `from_query(...)`
+- `models/rpt_customer_revenue_wrapped.sql`: downstream semantic query model using raw `query(...)`
 
 ## Profile
 
@@ -26,12 +27,30 @@ dbt seed --profiles-dir .
 dbt run --profiles-dir .
 ```
 
-The semantic node registers `orders_semantic`, and the final model queries it with:
+The semantic node registers `orders_semantic`, and the example shows both downstream query styles.
+
+Use `from_query(...)` when you want a `FROM`-safe relation without writing parentheses yourself:
 
 ```jinja
-{{ dbt_semduck.query(
-    ref('orders_semantic_node'),
+select *
+from {{ dbt_semduck.from_query(
+    ref('sev_orders'),
     'dimensions customer_name
      metrics total_revenue, total_revenue / 1000 as revenue_in_thousands'
 ) }}
+```
+
+Use `query(...)` when you want the raw compiled SQL text directly. A simple pattern is to put it in a CTE and select from that:
+
+```jinja
+with semduck_query as (
+  {{ dbt_semduck.query(
+      ref('sev_orders'),
+      'dimensions customer_name
+       metrics total_revenue'
+  ) }}
+)
+
+select *
+from semduck_query
 ```

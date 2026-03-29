@@ -25,23 +25,34 @@ Downstream models can query a semantic request with:
 
 ```jinja
 select *
-from (
-  {{ dbt_semduck.query(
-      ref('orders_semantic_node'),
-      'dimensions region metrics total_revenue'
-  ) }}
-)
+from {{ dbt_semduck.from_query(
+    ref('orders_semantic_node'),
+    'dimensions region metrics total_revenue'
+) }}
 ```
 
 The request suffix can also be split across lines for readability:
 
-```jinja
+```jinja-sql
 select *
-from (
+from {{ dbt_semduck.from_query(
+    ref('orders_semantic_node'),
+    'dimensions region
+     metrics total_revenue'
+) }}
+```
+
+`dbt_semduck.query(...)` still returns raw compiled SQL when you need to use the full query text directly.
+This is useful when you want more of a CTE style pattern like...
+
+```jinja-sql
+with semduck_query as (
   {{ dbt_semduck.query(
-      ref('orders_semantic_node'),
-      'dimensions region
-       metrics total_revenue'
+    ref('orders_semantic_node'),
+    'dimensions region
+     metrics total_revenue'
   ) }}
 )
+
+select * from semduck_query
 ```

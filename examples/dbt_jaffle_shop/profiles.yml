@@ -9,3 +9,12 @@ dbt_semduck_jaffle_shop:
         - "../../packages/semduck/src"
       plugins:
         - module: semduck.dbt.plugin
+
+    test:
+      type: duckdb
+      path: memory
+      threads: 1
+      module_paths:
+        - "../../packages/semduck/src"
+      plugins:
+        - module: semduck.dbt.plugin

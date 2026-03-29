@@ -24,6 +24,15 @@
   {{ return(dbt_semduck.semduck_query(request)) }}
 {%- endmacro %}
 
+{% macro from_query(semantic_node_relation, request_suffix, alias='semduck_query') -%}
+  {% if not execute %}
+    {{ return("(select 1 where 1 = 0) " ~ alias) }}
+  {% endif %}
+
+  {% set compiled = dbt_semduck.query(semantic_node_relation, request_suffix) %}
+  {{ return("(" ~ compiled ~ ") " ~ alias) }}
+{%- endmacro %}
+
 {% macro semduck_load_ddl(ddl_text) -%}
   {% if not execute %}
     {{ return(none) }}
