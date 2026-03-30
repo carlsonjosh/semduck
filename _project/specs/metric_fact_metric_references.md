@@ -137,12 +137,12 @@ supported, but it should compile against the staged named-metric outputs.
 Add coverage for these scenarios:
 
 - A semantic-view metric can aggregate a same-table fact:
-  - `revenue as sum(order_revenue)` compiles and executes correctly.
+  - `sum(order_revenue) as revenue` compiles and executes correctly.
 - Multiple metrics can share the same fact alias without duplicating its physical expression in SQL.
 - A semantic-view metric can reference same-table named metrics:
-  - `profit as sum(order_profit)`
-  - `revenue as sum(order_revenue)`
-  - `margin_pct as div0(profit, revenue)`
+  - `sum(order_profit) as profit`
+  - `sum(order_revenue) as revenue`
+  - `div0(profit, revenue) as margin_pct`
 - Forward metric references work when the graph is acyclic.
 - Multi-level same-table metric dependency chains work.
 - Direct self-reference fails.

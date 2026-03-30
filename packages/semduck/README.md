@@ -100,8 +100,8 @@ table orders as main.orders
     region as region
   )
   metrics (
-    total_revenue as sum(revenue),
-    order_count as count(order_id)
+    sum(revenue) as total_revenue,
+    count(order_id) as order_count
   );
 ```
 
@@ -143,7 +143,7 @@ table orders as main.orders
     region as region
   )
   metrics (
-    order_count as count(order_id)
+    count(order_id) as order_count
   );
 """)
 

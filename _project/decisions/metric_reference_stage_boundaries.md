@@ -30,13 +30,13 @@ original v1 spec.
 ## Open Questions
 
 - Should aggregate metrics be allowed to reference aggregate or post-aggregate metrics?
-  - Example: `double_profit as sum(total_profit)`
+  - Example: `sum(total_profit) as double_profit`
   - This currently remains invalid because it mixes aggregation stages in a way that is not clearly
     defined by the current planner model.
 
 - Should named formula metrics be allowed to mix aggregate metrics with row-level expressions in the
   same definition?
-  - Example: `blended_margin as total_profit / order_revenue`
+  - Example: `total_profit / order_revenue as blended_margin`
   - This currently remains invalid because it mixes row-grain and post-aggregate semantics in one
     expression.
 
