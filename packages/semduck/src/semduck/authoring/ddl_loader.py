@@ -17,8 +17,13 @@ _SECTION_RE = re.compile(
 )
 _DESCRIPTION_RE = re.compile(r"^description\s+'((?:''|[^'])*)'$", re.IGNORECASE | re.DOTALL)
 _JOIN_PROP_RE = re.compile(r"^(left_table|right_table|join_type|on)\s+(.+)$", re.IGNORECASE | re.DOTALL)
-_FIELD_RE = re.compile(
-    r"^([A-Za-z_][A-Za-z0-9_]*)\s+as\s+(.+?)(?:\s+type\s+([A-Za-z_][A-Za-z0-9_]*|\"[^\"]+\"))?(?:\s+description\s+'((?:''|[^'])*)')?$",
+_NAME_AND_TAIL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(.*)$", re.DOTALL)
+_FIELD_TAIL_RE = re.compile(
+    r"^(?:\s+type\s+([A-Za-z_][A-Za-z0-9_]*|\"[^\"]+\"))?(?:\s+description\s+'((?:''|[^'])*)')?\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+_METRIC_TAIL_RE = re.compile(
+    r"^(?:\s+default_agg\s+([A-Za-z_][A-Za-z0-9_]*))?(?:\s+description\s+'((?:''|[^'])*)')?\s*$",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -207,36 +212,48 @@ def _split_top_level_commas(body: str) -> list[str]:
 
 
 def _parse_field_def(item: str) -> dict[str, Any]:
-    match = _FIELD_RE.match(item)
+    expr, remainder = _split_top_level_as(item, label="field definition")
+    match = _NAME_AND_TAIL_RE.match(remainder)
     if match is None:
+        raise SemanticValidationError(f"Invalid semantic field definition: {item}")
+    tail_match = _FIELD_TAIL_RE.match(match.group(2))
+    if tail_match is None:
         raise SemanticValidationError(f"Invalid semantic field definition: {item}")
     obj: dict[str, Any] = {
         "name": match.group(1),
-        "expr": match.group(2).strip(),
+        "expr": expr.strip(),
     }
-    if match.group(3):
-        obj["data_type"] = match.group(3).strip('"')
-    if match.group(4):
-        obj["description"] = _unescape_string(match.group(4))
+    if tail_match.group(1):
+        obj["data_type"] = tail_match.group(1).strip('"')
+    if tail_match.group(2):
+        obj["description"] = _unescape_string(tail_match.group(2))
     return obj
 
 
 def _parse_metric_def(item: str) -> dict[str, Any]:
-    name, remainder = _split_once(item, " as ")
-    metric_type, expr, tail = _parse_metric_call(remainder)
+    expr, remainder = _split_top_level_as(item, label="metric definition")
+    match = _NAME_AND_TAIL_RE.match(remainder)
+    if match is None:
+        raise SemanticValidationError(f"Invalid metric definition: {item}")
+    tail_match = _METRIC_TAIL_RE.match(match.group(2))
+    if tail_match is None:
+        raise SemanticValidationError(f"Invalid metric definition: {item}")
+    try:
+        metric_type, parsed_expr, metric_tail = _parse_metric_call(expr)
+        if metric_tail.strip():
+            raise SemanticValidationError(f"Invalid metric definition: {item}")
+        expr = parsed_expr
+    except SemanticValidationError:
+        metric_type = "expr"
     obj: dict[str, Any] = {
-        "name": name.strip(),
+        "name": match.group(1).strip(),
         "metric_type": metric_type,
-        "expr": expr,
+        "expr": expr.strip(),
     }
-    tail = tail.strip()
-    if tail:
-        default_match = re.search(r"\bdefault_agg\s+([A-Za-z_][A-Za-z0-9_]*)", tail, re.IGNORECASE)
-        if default_match:
-            obj["default_agg"] = default_match.group(1)
-        description_match = re.search(r"\bdescription\s+'((?:''|[^'])*)'$", tail, re.IGNORECASE)
-        if description_match:
-            obj["description"] = _unescape_string(description_match.group(1))
+    if tail_match.group(1):
+        obj["default_agg"] = tail_match.group(1)
+    if tail_match.group(2):
+        obj["description"] = _unescape_string(tail_match.group(2))
     return obj
 
 
@@ -244,7 +261,9 @@ def _parse_metric_call(remainder: str) -> tuple[str, str, str]:
     remainder = remainder.strip()
     open_paren = remainder.find("(")
     if open_paren == -1:
-        raise SemanticValidationError(f"Metric definition must use <metric_type>(<expr>): {remainder}")
+        raise SemanticValidationError(
+            f"Metric expression must use <metric_type>(<expr>) when using an aggregate: {remainder}"
+        )
     metric_type = remainder[:open_paren].strip()
     depth = 0
     in_quotes = False
@@ -263,11 +282,43 @@ def _parse_metric_call(remainder: str) -> tuple[str, str, str]:
     raise SemanticValidationError(f"Unclosed metric expression: {remainder}")
 
 
-def _split_once(value: str, separator: str) -> tuple[str, str]:
-    parts = value.split(separator, 1)
-    if len(parts) != 2:
-        raise SemanticValidationError(f"Expected '{separator.strip()}' in definition: {value}")
-    return parts[0], parts[1]
+def _split_top_level_as(value: str, *, label: str) -> tuple[str, str]:
+    in_single_quotes = False
+    in_double_quotes = False
+    depth = 0
+    split_index: int | None = None
+    lower_value = value.lower()
+    index = 0
+
+    while index < len(value):
+        ch = value[index]
+        if ch == "'" and not in_double_quotes:
+            if in_single_quotes and index + 1 < len(value) and value[index + 1] == "'":
+                index += 2
+                continue
+            in_single_quotes = not in_single_quotes
+        elif ch == '"' and not in_single_quotes:
+            in_double_quotes = not in_double_quotes
+        elif not in_single_quotes and not in_double_quotes:
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            elif (
+                depth == 0
+                and lower_value.startswith(" as ", index)
+            ):
+                split_index = index
+        index += 1
+
+    if split_index is None:
+        raise SemanticValidationError(f"Expected 'as' in {label}: {value}")
+
+    left = value[:split_index].strip()
+    right = value[split_index + 4 :].strip()
+    if not left or not right:
+        raise SemanticValidationError(f"Expected '<expr> as <name>' in {label}: {value}")
+    return left, right
 
 
 def _unescape_string(value: str) -> str:

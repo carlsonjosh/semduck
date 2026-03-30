@@ -8,5 +8,5 @@ table orders as {{ ref('orders') }}
     region as region type varchar
   )
   metrics (
-    total_revenue as sum(revenue)
+    sum(revenue) as total_revenue
   );

@@ -95,7 +95,7 @@ table orders as mart.orders_base
     region as region
   )
   metrics (
-    order_count as count(order_id)
+    count(order_id) as order_count
   );
 """
     ddl_sql = ddl_text.replace("'", "''")

@@ -8,5 +8,5 @@ table raw_orders as {{ source('raw', 'orders_seed') }}
     region as region
   )
   metrics (
-    total_revenue as sum(revenue)
+    sum(revenue) as total_revenue
   );

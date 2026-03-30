@@ -17,7 +17,7 @@ table orders as {{ ref('orders') }}
     region as region
   )
   metrics (
-    total_revenue as sum(revenue)
+    sum(revenue) as total_revenue
   );
 ```
 
