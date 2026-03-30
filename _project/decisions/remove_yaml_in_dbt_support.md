@@ -11,13 +11,16 @@ Accepted.
 - YAML specs loaded through the Python API or CLI
 - semantic DDL loaded through the Python API, CLI, or `dbt-semduck`
 
-Earlier versions of the `dbt-semduck` package also supported loading YAML files from dbt. That path required dbt-specific relation resolution logic inside `semduck` so YAML files could contain unresolved base table references that were later converted into concrete relations.
+Earlier versions of the `dbt-semduck` package also supported loading YAML files from dbt. That
+path required dbt-specific relation resolution logic inside `semduck` so YAML files could contain
+unresolved base table references that were later converted into concrete relations.
 
 That created an architectural leak:
 
 - `semduck` was no longer only a semantic runtime and compiler
 - `semduck` contained dbt-specific parsing and relation-resolution behavior
-- the dbt package and the core Python package shared responsibility for dbt semantics in an unclear way
+- the dbt package and the core Python package shared responsibility for dbt semantics in an unclear
+  way
 
 This conflicted with the intended boundary for the project.
 
@@ -25,7 +28,8 @@ This conflicted with the intended boundary for the project.
 
 We removed YAML-in-dbt support.
 
-`dbt-semduck` now supports semantic definitions in dbt through inline semantic DDL only. The dbt materialization passes compiled DDL into `semduck`, and `semduck` parses only concrete relations.
+`dbt-semduck` now supports semantic definitions in dbt through inline semantic DDL only. The dbt
+materialization passes compiled DDL into `semduck`, and `semduck` parses only concrete relations.
 
 The core rule is:
 
@@ -38,7 +42,8 @@ That means `semduck` must not depend on unresolved dbt constructs such as:
 - dbt relation maps
 - dbt graph inspection
 
-`semduck` should only see already-normalized table references, in the same way the DDL path normalizes table names after dbt compilation.
+`semduck` should only see already-normalized table references, in the same way the DDL path
+normalizes table names after dbt compilation.
 
 ## Why
 
@@ -55,7 +60,8 @@ This also avoids maintaining two dbt integration paths:
 - inline DDL with compiled concrete relations
 - YAML with unresolved symbolic relations
 
-The DDL path is the stronger primary path because it lets dbt do what dbt already does well: compile model SQL into concrete relation references before execution.
+The DDL path is the stronger primary path because it lets dbt do what dbt already does well:
+compile model SQL into concrete relation references before execution.
 
 ## Consequences
 
@@ -76,7 +82,9 @@ Current unsupported flow:
 
 If YAML-in-dbt is desired in the future, it must not reintroduce dbt parsing into `semduck`.
 
-That means the YAML handed to `semduck` would need to contain already-normalized table references, matching the same concrete shape used by the DDL path. In practice, `base_table` would need to be resolved before `semduck` sees the spec, for example:
+That means the YAML handed to `semduck` would need to contain already-normalized table references,
+matching the same concrete shape used by the DDL path. In practice, `base_table` would need to be
+resolved before `semduck` sees the spec, for example:
 
 ```yaml
 base_table:
