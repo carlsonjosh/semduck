@@ -168,7 +168,7 @@ Relevant API entry points:
 - Supported in dbt: inline semantic DDL compiled by dbt and then loaded into `semduck`
 - Not supported in dbt: YAML specs containing unresolved `ref(...)` or `source(...)`
 
-The design note for that boundary is in [`docs/design_decisions/remove_yaml_in_dbt_support.md`](https://github.com/carlsonjosh/semduck/blob/main/docs/design_decisions/remove_yaml_in_dbt_support.md).
+The design note for that boundary is in [`project/decisions/remove_yaml_in_dbt_support.md`](https://github.com/carlsonjosh/semduck/blob/main/project/decisions/remove_yaml_in_dbt_support.md).
 
 ## Repo Examples
 
