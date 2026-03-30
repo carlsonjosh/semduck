@@ -35,6 +35,17 @@ class AskResult(BaseModel):
     provider: str
     model: str
     chosen_view: str
+    row_limit: int | None = None
+    total_row_count: int = 0
+    omitted_row_count: int = 0
+
+
+class AskExecutionError(Exception):
+    def __init__(self, code: str, message: str, troubleshooting: list[str] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.troubleshooting = troubleshooting or []
 
 
 @dataclass
@@ -42,6 +53,9 @@ class AskDependencies:
     conn: Any
     requested_view: str | None = None
     sql_only: bool = False
+
+
+TEXT_RESULT_ROW_LIMIT = 20
 
 
 def _resolve_agent_model(
@@ -59,6 +73,38 @@ def _resolve_agent_model(
     return resolved.provider_name, resolved.model, agent_model
 
 
+def _troubleshooting_for_error(code: str) -> list[str]:
+    hints = {
+        "registry": [
+            "Initialize and load semantic views into the DuckDB registry before using ask.",
+            "Use list_semantic_views or semduck mcp resources to confirm which views are available.",
+        ],
+        "parse": [
+            "Have the agent regenerate a semduck request instead of raw SQL.",
+            "Validate the generated request with compile_request before executing it.",
+        ],
+        "resolution": [
+            "Confirm the requested dimensions and metrics exist in describe_semantic_view output.",
+            "If the question is ambiguous, constrain the run with --view.",
+        ],
+        "compile": [
+            "Inspect the generated semduck request and re-run compile_request.",
+            "Confirm the selected semantic view contains the requested fields.",
+        ],
+        "validation": [
+            "Check the config path and provider settings for typos.",
+            "Confirm the selected provider has a model configured.",
+        ],
+    }
+    return hints.get(
+        code,
+        [
+            "Check the configured provider, model, and semantic view inputs.",
+            "Use --sql-only to inspect the generated semantic request and compiled SQL separately.",
+        ],
+    )
+
+
 def create_ask_agent(model: Any) -> Agent[AskDependencies, AskPlan]:
     agent = Agent(
         model,
@@ -68,6 +114,7 @@ def create_ask_agent(model: Any) -> Agent[AskDependencies, AskPlan]:
             "You translate analytics questions into semduck semantic requests. "
             "Do not invent arbitrary SQL as the primary answer. "
             "Use the available semduck tools to inspect semantic views before choosing a request. "
+            "Verify dimensions and metrics against describe_semantic_view before finalizing a request. "
             "If you use compile or query tools, use them only with semduck requests. "
             "Your final output must contain a concise answer_text, one semantic_request, and the chosen_view."
         ),
@@ -80,7 +127,10 @@ def create_ask_agent(model: Any) -> Agent[AskDependencies, AskPlan]:
                 f"The user requested semantic view `{ctx.deps.requested_view}`. "
                 "You must use that view unless compilation proves it invalid."
             )
-        return "If multiple semantic views exist, inspect them and choose the most relevant one."
+        return (
+            "If multiple semantic views exist, inspect them and choose the most relevant one. "
+            "If no semantic views are available, do not fabricate a request; explain that the registry needs to be loaded."
+        )
 
     @agent.system_prompt
     def sql_only_instructions(ctx: RunContext[AskDependencies]) -> str:
@@ -141,43 +191,80 @@ def ask_question(
     model: str | None = None,
     view: str | None = None,
     execute: bool = True,
+    row_limit: int | None = None,
 ) -> AskResult:
-    provider_name, model_name, agent_model = _resolve_agent_model(
-        config=config,
-        provider=provider,
-        model=model,
-    )
-    agent = create_ask_agent(agent_model)
-    conn, should_close = _connect_if_needed(conn_or_db)
     try:
-        plan = agent.run_sync(
-            question,
-            deps=AskDependencies(
-                conn=conn,
-                requested_view=view,
-                sql_only=not execute,
-            ),
-        ).output
-
-        compiled = compile_request_service(conn, CompileRequestArgs(request=plan.semantic_request))
-        columns: list[str] = []
-        rows: list[list[Any]] = []
-        if execute:
-            query_result = query_request_service(conn, QueryRequestArgs(request=plan.semantic_request))
-            columns = query_result.columns
-            rows = query_result.rows
-
-        return AskResult(
-            answer_text=plan.answer_text,
-            semantic_request=plan.semantic_request,
-            sql=compiled.sql,
-            columns=columns,
-            rows=rows,
-            executed=execute,
-            provider=provider_name,
-            model=model_name,
-            chosen_view=compiled.semantic_view_ref,
+        provider_name, model_name, agent_model = _resolve_agent_model(
+            config=config,
+            provider=provider,
+            model=model,
         )
+        agent = create_ask_agent(agent_model)
+        conn, should_close = _connect_if_needed(conn_or_db)
+    except (ValueError, FileNotFoundError) as exc:
+        raise AskExecutionError(
+            code="configuration",
+            message=str(exc),
+            troubleshooting=[
+                "Check the config file path and provider name.",
+                "Confirm the selected provider has a configured model and reachable base URL.",
+            ],
+        ) from exc
+
+    try:
+        try:
+            plan = agent.run_sync(
+                question,
+                deps=AskDependencies(
+                    conn=conn,
+                    requested_view=view,
+                    sql_only=not execute,
+                ),
+            ).output
+
+            compiled = compile_request_service(conn, CompileRequestArgs(request=plan.semantic_request))
+            columns: list[str] = []
+            rows: list[list[Any]] = []
+            total_row_count = 0
+            omitted_row_count = 0
+            if execute:
+                query_result = query_request_service(conn, QueryRequestArgs(request=plan.semantic_request))
+                columns = query_result.columns
+                total_row_count = len(query_result.rows)
+                if row_limit is not None and row_limit >= 0:
+                    rows = query_result.rows[:row_limit]
+                    omitted_row_count = max(total_row_count - len(rows), 0)
+                else:
+                    rows = query_result.rows
+
+            return AskResult(
+                answer_text=plan.answer_text,
+                semantic_request=plan.semantic_request,
+                sql=compiled.sql,
+                columns=columns,
+                rows=rows,
+                executed=execute,
+                provider=provider_name,
+                model=model_name,
+                chosen_view=compiled.semantic_view_ref,
+                row_limit=row_limit,
+                total_row_count=total_row_count,
+                omitted_row_count=omitted_row_count,
+            )
+        except AskExecutionError:
+            raise
+        except Exception as exc:
+            if hasattr(exc, "detail") and hasattr(exc.detail, "code"):
+                code = exc.detail.code
+                troubleshooting = _troubleshooting_for_error(code)
+            else:
+                code = "runtime"
+                troubleshooting = _troubleshooting_for_error(code)
+            raise AskExecutionError(
+                code=code,
+                message=str(exc),
+                troubleshooting=troubleshooting,
+            ) from exc
     finally:
         if should_close:
             conn.close()
@@ -197,8 +284,16 @@ def format_ask_result_text(result: AskResult) -> str:
         lines.append("Results:")
         if result.columns:
             lines.append(" | ".join(result.columns))
-            for row in result.rows:
+            display_rows = result.rows[:TEXT_RESULT_ROW_LIMIT]
+            for row in display_rows:
                 lines.append(" | ".join("" if value is None else str(value) for value in row))
+            explicit_omitted = getattr(result, "omitted_row_count", None)
+            if explicit_omitted is None:
+                omitted_count = len(result.rows) - len(display_rows)
+            else:
+                omitted_count = explicit_omitted
+            if omitted_count > 0:
+                lines.append(f"... {omitted_count} more rows omitted")
         else:
             lines.append("(no rows)")
     else:

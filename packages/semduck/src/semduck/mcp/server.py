@@ -133,7 +133,11 @@ def build_mcp_server(
             f"Database: {deps.db_path}",
             "Available semantic views:",
         ]
-        lines.extend(f"- {name}" for name in view_names)
+        if view_names:
+            lines.extend(f"- {name}" for name in view_names)
+        else:
+            lines.append("- none loaded")
+            lines.append("Hint: initialize and load semantic definitions before using ask-oriented MCP workflows.")
         lines.append(_provider_defaults_summary(deps))
         return "\n".join(lines)
 
@@ -145,7 +149,8 @@ def build_mcp_server(
             "Examples:\n"
             "- orders_semantic dimensions region metrics total_revenue\n"
             "- orders_semantic dimensions customer_name metrics total_revenue where region = 'US'\n\n"
-            "Use compile_request before query_request. Generate semduck requests, not arbitrary SQL."
+            "Use compile_request before query_request. Generate semduck requests, not arbitrary SQL.\n"
+            "If no semantic views are loaded yet, initialize and load the registry before attempting ask workflows."
         )
 
     @mcp.resource("semduck://views/{view_name}")

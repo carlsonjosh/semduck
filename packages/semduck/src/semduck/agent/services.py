@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import duckdb
+
 from semduck.api import (
     compile_request,
     get_semantic_view,
@@ -191,7 +193,12 @@ def query_request_service(conn: Any, args: QueryRequestArgs) -> QueryRequestResu
 
 def list_semantic_views_service(conn: Any, args: ListSemanticViewsArgs | None = None) -> ListSemanticViewsResult:
     _ = args or ListSemanticViewsArgs()
-    return ListSemanticViewsResult(view_names=list_semantic_views(conn))
+    try:
+        return ListSemanticViewsResult(view_names=list_semantic_views(conn))
+    except duckdb.Error as exc:
+        if 'schema "semantic" does not exist' in str(exc):
+            return ListSemanticViewsResult(view_names=[])
+        raise
 
 
 def describe_semantic_view_service(conn: Any, args: DescribeSemanticViewArgs) -> SemanticViewDescriptor:

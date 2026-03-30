@@ -1,4 +1,5 @@
 from semduck.agent import (
+    AskExecutionError,
     AskPlan,
     AskResult,
     CheckDefinitionArgs,
@@ -95,6 +96,7 @@ from semduck.types import (
 
 __all__ = [
     "AskPlan",
+    "AskExecutionError",
     "AskResult",
     "CheckDefinitionArgs",
     "CheckDefinitionResult",

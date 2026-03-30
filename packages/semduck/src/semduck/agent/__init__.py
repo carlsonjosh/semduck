@@ -1,4 +1,12 @@
-from semduck.agent.ask import AskPlan, AskResult, ask_question, create_ask_agent, format_ask_result_json, format_ask_result_text
+from semduck.agent.ask import (
+    AskExecutionError,
+    AskPlan,
+    AskResult,
+    ask_question,
+    create_ask_agent,
+    format_ask_result_json,
+    format_ask_result_text,
+)
 from semduck.agent.models import (
     CheckDefinitionArgs,
     CheckDefinitionResult,
@@ -32,6 +40,7 @@ from semduck.agent.services import (
 
 __all__ = [
     "AskPlan",
+    "AskExecutionError",
     "AskResult",
     "CheckDefinitionArgs",
     "CheckDefinitionResult",

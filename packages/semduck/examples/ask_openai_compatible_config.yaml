@@ -1,0 +1,7 @@
+llm:
+  default_provider: local_openai
+  providers:
+    local_openai:
+      type: openai_compatible
+      model: qwen2.5-coder
+      base_url: http://localhost:8000/v1

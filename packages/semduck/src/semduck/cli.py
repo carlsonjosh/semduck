@@ -6,7 +6,7 @@ from pathlib import Path
 
 import duckdb
 
-from semduck.agent import ask_question, format_ask_result_json, format_ask_result_text
+from semduck.agent import AskExecutionError, ask_question, format_ask_result_json, format_ask_result_text
 from semduck.api import compile_request, init_registry, load_semantic_ddl_file, load_semantic_yaml_file
 from semduck.agent.services import SemduckServiceError
 from semduck.errors import SemanticViewError
@@ -46,6 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     ask_cmd.add_argument("--model")
     ask_cmd.add_argument("--view")
     ask_cmd.add_argument("--sql-only", action="store_true")
+    ask_cmd.add_argument("--row-limit", type=int)
     ask_cmd.add_argument("--output-format", choices=["text", "json"], default="text")
 
     mcp_cmd = subparsers.add_parser("mcp")
@@ -142,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
                     model=args.model,
                     view=args.view,
                     execute=not args.sql_only,
+                    row_limit=args.row_limit,
                 )
                 if args.output_format == "json":
                     print(format_ask_result_json(result))
@@ -150,6 +152,13 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
     except SemanticViewError as exc:
         print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except AskExecutionError as exc:
+        print(f"error[{exc.code}]: {exc.message}", file=sys.stderr)
+        if exc.troubleshooting:
+            print("troubleshooting:", file=sys.stderr)
+            for item in exc.troubleshooting:
+                print(f"- {item}", file=sys.stderr)
         return 1
     except (SemduckServiceError, ValueError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)

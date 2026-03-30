@@ -59,6 +59,16 @@ semduck ask \
   --sql-only
 ```
 
+Configure an OpenAI-compatible local server and run the ask CLI:
+
+```bash
+semduck ask \
+  --db examples/dbt_example/jaffle_shop.duckdb \
+  --config packages/semduck/examples/ask_openai_compatible_config.yaml \
+  --question "What is total revenue by customer name?" \
+  --sql-only
+```
+
 Start the semduck MCP server over `stdio`:
 
 ```bash
@@ -193,6 +203,7 @@ The design note for that boundary is in [`project/decisions/remove_yaml_in_dbt_s
 - Query an existing database from the CLI: [`examples/query_existing_db_cli.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/query_existing_db_cli.sh)
 - Register an Ollama provider config and use `semduck ask`: [`examples/ask_existing_db_cli.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_existing_db_cli.sh)
 - Example Ollama provider config: [`examples/ask_ollama_config.yaml`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_ollama_config.yaml)
+- Example OpenAI-compatible local provider config: [`examples/ask_openai_compatible_config.yaml`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_openai_compatible_config.yaml)
 - Start the MCP server over stdio: [`examples/mcp_server_stdio.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/mcp_server_stdio.sh)
 - Example MCP client config: [`examples/mcp_client_config.json`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/mcp_client_config.json)
 - MCP startup and client connection guide: [`examples/mcp_connection_guide.md`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/mcp_connection_guide.md)
