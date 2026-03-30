@@ -10,22 +10,6 @@ def fully_qualified_table(physical_schema: str | None, physical_table: str) -> s
 
 
 def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
-    select_parts = []
-    group_by_positions = []
-    position = 1
-
-    for dimension in plan.dimensions:
-        select_parts.append(f"{dimension.expr_sql} as {dimension.request_name}")
-        group_by_positions.append(str(position))
-        position += 1
-
-    for metric in plan.metrics:
-        select_parts.append(f"{metric.expr_sql} as {metric.request_name}")
-        position += 1
-
-    if not select_parts:
-        select_parts.append("*")
-
     anchor = registry.tables[plan.from_table]
     from_sql = f"{fully_qualified_table(anchor.physical_schema, anchor.physical_table)} {plan.from_alias}"
 
@@ -50,15 +34,51 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
             f"{joined_table.alias} ON {join_expr}"
         )
 
-    sql = "select\n  " + ",\n  ".join(select_parts) + f"\nfrom {from_sql}"
+    raw_sql = f"from {from_sql}"
     if join_sql_parts:
-        sql += "\n" + "\n".join(join_sql_parts)
+        raw_sql += "\n" + "\n".join(join_sql_parts)
     if plan.where_clause:
-        sql += f"\nwhere {plan.where_clause}"
-    if plan.metrics and plan.dimensions:
-        sql += f"\ngroup by {', '.join(group_by_positions)}"
-    if not plan.derived_dimensions and not plan.derived_metrics:
-        return sql + ";"
+        raw_sql += f"\nwhere {plan.where_clause}"
+
+    if not plan.metrics:
+        select_parts = []
+        for dimension in plan.dimensions:
+            select_parts.append(f"{dimension.expr_sql} as {dimension.request_name}")
+        if not select_parts:
+            select_parts.append("*")
+        sql = "select\n  " + ",\n  ".join(select_parts) + f"\n{raw_sql}"
+        if not plan.derived_dimensions and not plan.derived_metrics:
+            return sql + ";"
+    else:
+        base_select_parts = []
+        for dimension in plan.dimensions:
+            base_select_parts.append(f"{dimension.expr_sql} as {dimension.request_name}")
+        for base_expression in plan.base_expressions:
+            base_select_parts.append(f"{base_expression.expr_sql} as {base_expression.alias}")
+        if not base_select_parts:
+            base_select_parts.append("*")
+
+        base_sql = "select\n  " + ",\n  ".join(base_select_parts) + f"\n{raw_sql}"
+
+        aggregate_select_parts = []
+        group_by_positions = []
+        position = 1
+        for dimension in plan.dimensions:
+            aggregate_select_parts.append(dimension.request_name)
+            group_by_positions.append(str(position))
+            position += 1
+
+        for metric in plan.metrics:
+            aggregate_select_parts.append(f"{metric.expr_sql} as {metric.request_name}")
+            position += 1
+
+        sql = "select\n  " + ",\n  ".join(aggregate_select_parts) + "\nfrom (\n"
+        sql += "\n".join(f"  {line}" for line in base_sql.splitlines())
+        sql += "\n) semduck_base"
+        if plan.metrics and plan.dimensions:
+            sql += f"\ngroup by {', '.join(group_by_positions)}"
+        if not plan.derived_dimensions and not plan.derived_metrics:
+            return sql + ";"
 
     outer_select_parts = []
     for output_name in plan.output_dimensions:

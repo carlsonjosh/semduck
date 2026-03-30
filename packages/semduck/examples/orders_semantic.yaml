@@ -17,13 +17,25 @@ tables:
         expr: order_date
         data_type: date
     facts:
-      - name: revenue
+      - name: order_revenue
         expr: revenue
         data_type: double
+      - name: order_profit
+        expr: revenue - unit_costs
+        data_type: double
     metrics:
+      - name: row_profit_metric
+        metric_type: expr
+        expr: order_profit
       - name: total_revenue
         metric_type: sum
-        expr: revenue
+        expr: order_revenue
+      - name: total_profit
+        metric_type: sum
+        expr: row_profit_metric
+      - name: margin_pct
+        metric_type: expr
+        expr: total_profit / total_revenue
       - name: order_count
         metric_type: count
         expr: order_id
@@ -45,4 +57,3 @@ joins:
     right_table: customers
     join_type: left
     join_expr: LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id
-

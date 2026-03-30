@@ -6,7 +6,8 @@ def test_compile_request(loaded_conn):
         loaded_conn,
         "orders_semantic dimensions region metrics total_revenue where region = 'US'",
     )
-    assert "sum(o.revenue) as total_revenue" in compiled.sql
+    assert "sum(order_revenue) as total_revenue" in compiled.sql
+    assert "o.revenue as order_revenue" in compiled.sql
     assert "where (o.region) = 'US'" in compiled.sql
 
 
@@ -35,6 +36,15 @@ def test_execute_request_with_derived_metric(loaded_conn):
     )
     rows = relation.fetchall()
     assert rows == [(0.45,)]
+
+
+def test_execute_request_with_named_formula_metric(loaded_conn):
+    relation = execute_request(
+        loaded_conn,
+        "orders_semantic metrics margin_pct",
+    )
+    rows = relation.fetchall()
+    assert rows == [(0.4,)]
 
 
 def test_execute_request_with_derived_dimension(loaded_conn):
