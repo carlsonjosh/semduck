@@ -100,6 +100,12 @@ class ResolvedMetric:
 
 
 @dataclass
+class ResolvedBaseExpression:
+    alias: str
+    expr_sql: str
+
+
+@dataclass
 class ResolvedDerivedDimension:
     alias: str
     expr_sql: str
@@ -118,6 +124,7 @@ class QueryPlan:
     from_alias: str
     joins: list[SemanticJoin]
     dimensions: list[ResolvedDimension]
+    base_expressions: list[ResolvedBaseExpression]
     metrics: list[ResolvedMetric]
     derived_dimensions: list[ResolvedDerivedDimension]
     derived_metrics: list[ResolvedDerivedMetric]

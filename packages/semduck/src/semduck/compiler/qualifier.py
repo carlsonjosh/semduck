@@ -109,16 +109,22 @@ def qualify_expr(expr: str, alias: str) -> str:
     return rewrite_expr_identifiers(expr, _PrefixedDict())
 
 
-def qualify_metric_expr(metric: SemanticObject, alias: str) -> str:
-    expr = metric.expr.strip()
-    if metric.metric_type == "sum":
-        return f"sum({qualify_expr(expr, alias)})"
-    if metric.metric_type == "count":
-        if expr == "*":
+def wrap_metric_expr(metric_type: str | None, expr: str) -> str:
+    if metric_type == "sum":
+        return f"sum({expr})"
+    if metric_type == "count":
+        if expr.strip() == "*":
             return "count(*)"
-        return f"count({qualify_expr(expr, alias)})"
-    if metric.metric_type == "count_distinct":
-        return f"count(distinct {qualify_expr(expr, alias)})"
-    if metric.metric_type == "avg":
-        return f"avg({qualify_expr(expr, alias)})"
-    return qualify_expr(expr, alias)
+        return f"count({expr})"
+    if metric_type == "count_distinct":
+        return f"count(distinct {expr})"
+    if metric_type == "avg":
+        return f"avg({expr})"
+    return expr
+
+
+def qualify_metric_expr(metric: SemanticObject, alias: str, *, expr: str | None = None) -> str:
+    metric_expr = (expr if expr is not None else metric.expr).strip()
+    if metric.metric_type in {"sum", "count", "count_distinct", "avg"}:
+        return wrap_metric_expr(metric.metric_type, qualify_expr(metric_expr, alias))
+    return qualify_expr(metric_expr, alias)

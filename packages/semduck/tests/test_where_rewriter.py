@@ -11,7 +11,7 @@ def test_rewrite_dimension_reference(loaded_conn):
 
 def test_rewrite_fact_reference(loaded_conn):
     registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
-    rewritten = rewrite_where_clause("revenue > 100", registry)
+    rewritten = rewrite_where_clause("order_revenue > 100", registry)
     assert rewritten == "(o.revenue) > 100"
 
 

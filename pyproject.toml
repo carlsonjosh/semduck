@@ -5,6 +5,7 @@ members = ["packages/semduck"]
 dev = [
   "pytest",
   "dbt-duckdb>=1.9",
+  "numpy>=2.4.4",
 ]
 
 [tool.uv.sources]

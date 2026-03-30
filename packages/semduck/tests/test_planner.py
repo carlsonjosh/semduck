@@ -82,6 +82,67 @@ def test_derived_metric_resolution(loaded_conn):
     assert plan.derived_metrics[0].alias == "revenue_in_thousands"
 
 
+def test_named_formula_metric_resolution(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    plan = build_query_plan(
+        parse_request("orders_semantic metrics margin_pct"),
+        registry,
+    )
+    assert sorted(metric.request_name for metric in plan.metrics) == ["total_profit", "total_revenue"]
+    assert len(plan.derived_metrics) == 1
+    assert plan.derived_metrics[0].alias == "margin_pct"
+
+
+def test_row_level_helper_metric_rejected_as_output(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    try:
+        build_query_plan(
+            parse_request("orders_semantic metrics row_profit_metric"),
+            registry,
+        )
+    except SemanticResolutionError:
+        pass
+    else:
+        raise AssertionError("expected SemanticResolutionError")
+
+
+def test_cross_table_metric_reference_rejected(conn):
+    conn.execute("insert into semantic.semantic_views (view_name) values ('sample')")
+    conn.execute(
+        """
+        insert into semantic.semantic_view_tables
+        (view_name, table_name, physical_table, table_alias)
+        values
+        ('sample', 'orders', 'orders_tbl', 'o'),
+        ('sample', 'customers', 'customers_tbl', 'c')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.facts
+        (view_name, table_name, fact_name, expr)
+        values
+        ('sample', 'orders', 'order_revenue', 'revenue'),
+        ('sample', 'customers', 'customer_value', 'lifetime_value')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.metrics
+        (view_name, table_name, metric_name, metric_type, expr)
+        values
+        ('sample', 'orders', 'bad_metric', 'sum', 'customer_value')
+        """
+    )
+    registry = load_semantic_view_registry(conn, "sample")
+    try:
+        build_query_plan(parse_request("sample metrics bad_metric"), registry)
+    except SemanticResolutionError:
+        pass
+    else:
+        raise AssertionError("expected SemanticResolutionError")
+
+
 def test_derived_dimension_resolution(loaded_conn):
     registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
     plan = build_query_plan(

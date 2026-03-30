@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Committed.
 
 ## Addresses Issue
 
@@ -11,6 +11,14 @@ Proposed.
 ## Implemented By
 
 - None yet.
+
+## Related Decision
+
+- `_project/decisions/metric_reference_stage_boundaries.md`
+
+## Related Future Spec
+
+- `_project/specs/cross_table_metric_composition.md`
 
 ## Summary
 
@@ -129,12 +137,12 @@ supported, but it should compile against the staged named-metric outputs.
 Add coverage for these scenarios:
 
 - A semantic-view metric can aggregate a same-table fact:
-  - `revenue as sum(order_revenue)` compiles and executes correctly.
+  - `sum(order_revenue) as revenue` compiles and executes correctly.
 - Multiple metrics can share the same fact alias without duplicating its physical expression in SQL.
 - A semantic-view metric can reference same-table named metrics:
-  - `profit as sum(order_profit)`
-  - `revenue as sum(order_revenue)`
-  - `margin_pct as div0(profit, revenue)`
+  - `sum(order_profit) as profit`
+  - `sum(order_revenue) as revenue`
+  - `div0(profit, revenue) as margin_pct`
 - Forward metric references work when the graph is acyclic.
 - Multi-level same-table metric dependency chains work.
 - Direct self-reference fails.
@@ -142,6 +150,9 @@ Add coverage for these scenarios:
 - Cross-table fact or metric references fail.
 - Unknown semantic references fail with a clear error.
 - Request-time derived metrics still work when their named metric inputs are built from facts.
+
+Cross-table semantic metric composition is intentionally not part of this spec and should be
+explored separately in `_project/specs/cross_table_metric_composition.md`.
 
 Acceptance scenarios:
 
@@ -158,3 +169,11 @@ Acceptance scenarios:
 - Metric definition order does not matter.
 - SQL function detection continues to rely on the existing identifier parsing behavior.
 - Full recursive physical-expression expansion is not the primary implementation strategy.
+
+## Remaining Questions
+
+The feature is now implemented for the core staged cases, but a few broader stage-composition rules
+still need an explicit design decision.
+
+See `_project/decisions/metric_reference_stage_boundaries.md` for the remaining potential gaps to
+evaluate before widening the metric-reference contract further.

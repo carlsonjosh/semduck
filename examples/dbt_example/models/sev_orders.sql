@@ -1,6 +1,6 @@
 {{ config(materialized='semduck_semantic') }}
 
-create semantic view orders_semantic as
+create semantic view orders as
 table orders as {{ ref('fct_orders') }}
   primary key (order_id)
   dimensions (
@@ -12,8 +12,9 @@ table orders as {{ ref('fct_orders') }}
     order_total as order_total type double
   )
   metrics (
-    total_revenue as sum(order_total),
-    order_count as count(order_id)
+    sum(order_total) as total_revenue,
+    count(order_id) as order_count,
+    total_revenue / order_count as average_order_value
   )
 
 table customers as {{ ref('dim_customers') }}

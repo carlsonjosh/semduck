@@ -31,7 +31,8 @@ def loaded_conn(conn, orders_yaml_path):
             customer_id integer,
             region varchar,
             order_date date,
-            revenue double
+            revenue double,
+            unit_costs double
         )
         """
     )
@@ -46,9 +47,9 @@ def loaded_conn(conn, orders_yaml_path):
     conn.execute(
         """
         insert into mart.orders_base values
-            (1, 10, 'US', '2024-01-01', 100.0),
-            (2, 11, 'US', '2024-01-02', 150.0),
-            (3, 12, 'CA', '2024-01-03', 200.0)
+            (1, 10, 'US', '2024-01-01', 100.0, 60.0),
+            (2, 11, 'US', '2024-01-02', 150.0, 90.0),
+            (3, 12, 'CA', '2024-01-03', 200.0, 120.0)
         """
     )
     conn.execute(
