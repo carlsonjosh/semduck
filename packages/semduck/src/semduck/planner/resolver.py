@@ -153,19 +153,27 @@ def build_query_plan(parsed: ParsedSemanticRequest, registry: SemanticViewRegist
         if isinstance(item, DerivedMetric):
             refs = _resolve_metric_expression_refs(item.expr, metric_index, fact_index)
             fact_refs = [name for name in refs if name in fact_index]
-            metric_refs = [name for name in refs if name in metric_index]
-            if fact_refs and (parsed.dimensions or parsed_metrics_have_named_metric or metric_refs):
+            base_metric_refs: list[str] = []
+            aggregate_metric_refs: list[str] = []
+            for ref_name in refs:
+                if ref_name not in metric_index:
+                    continue
+                resolution = _resolve_metric_name(ref_name, metric_index, fact_index, metric_resolution_cache)
+                if resolution.stage == "base":
+                    base_metric_refs.append(ref_name)
+                else:
+                    aggregate_metric_refs.append(ref_name)
+
+            if (fact_refs or base_metric_refs) and (
+                parsed.dimensions or parsed_metrics_have_named_metric or aggregate_metric_refs
+            ):
                 raise SemanticResolutionError(
-                    f"Derived metric expression cannot mix facts with grouped or metric-based queries: {item.alias}"
+                    f"Derived metric expression cannot mix row-level references with grouped or metric-based queries: {item.alias}"
                 )
             replacements = {}
             for ref_name in refs:
                 if ref_name in metric_index:
                     resolution = _resolve_metric_name(ref_name, metric_index, fact_index, metric_resolution_cache)
-                    if resolution.stage == "base":
-                        raise SemanticResolutionError(
-                            f"Derived metric expression cannot reference row-level helper metrics: {ref_name}"
-                        )
                     for base_expression in resolution.base_expressions:
                         base_expressions_by_alias.setdefault(base_expression.alias, base_expression)
                     for resolved in resolution.resolved_metrics:

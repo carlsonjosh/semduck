@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Committed.
 
 ## Addresses Issue
 
@@ -11,6 +11,14 @@ Proposed.
 ## Implemented By
 
 - None yet.
+
+## Related Decision
+
+- `_project/decisions/metric_reference_stage_boundaries.md`
+
+## Related Future Spec
+
+- `_project/specs/cross_table_metric_composition.md`
 
 ## Summary
 
@@ -143,6 +151,9 @@ Add coverage for these scenarios:
 - Unknown semantic references fail with a clear error.
 - Request-time derived metrics still work when their named metric inputs are built from facts.
 
+Cross-table semantic metric composition is intentionally not part of this spec and should be
+explored separately in `_project/specs/cross_table_metric_composition.md`.
+
 Acceptance scenarios:
 
 - A user can define a fact once and reference it from one or more semantic-view metrics.
@@ -158,3 +169,11 @@ Acceptance scenarios:
 - Metric definition order does not matter.
 - SQL function detection continues to rely on the existing identifier parsing behavior.
 - Full recursive physical-expression expansion is not the primary implementation strategy.
+
+## Remaining Questions
+
+The feature is now implemented for the core staged cases, but a few broader stage-composition rules
+still need an explicit design decision.
+
+See `_project/decisions/metric_reference_stage_boundaries.md` for the remaining potential gaps to
+evaluate before widening the metric-reference contract further.

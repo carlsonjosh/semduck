@@ -44,6 +44,8 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
         select_parts = []
         for dimension in plan.dimensions:
             select_parts.append(f"{dimension.expr_sql} as {dimension.request_name}")
+        for base_expression in plan.base_expressions:
+            select_parts.append(f"{base_expression.expr_sql} as {base_expression.alias}")
         if not select_parts:
             select_parts.append("*")
         sql = "select\n  " + ",\n  ".join(select_parts) + f"\n{raw_sql}"

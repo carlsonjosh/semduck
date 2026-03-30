@@ -60,6 +60,18 @@ def test_compile_metric_fact_and_metric_references(loaded_conn):
     assert "(total_profit) / (total_revenue) as margin_pct" in sql
 
 
+def test_compile_row_level_helper_derived_metric(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    plan = build_query_plan(
+        parse_request("orders_semantic metrics row_profit_metric / order_revenue as row_margin_pct"),
+        registry,
+    )
+    sql = compile_sql(plan, registry)
+    assert "order_profit as row_profit_metric__input" in sql
+    assert "o.revenue as order_revenue" in sql
+    assert "row_profit_metric__input / order_revenue as row_margin_pct" in sql
+
+
 def test_compile_derived_dimension_outer_select(loaded_conn):
     registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
     plan = build_query_plan(

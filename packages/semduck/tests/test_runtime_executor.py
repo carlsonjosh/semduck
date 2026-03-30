@@ -47,6 +47,15 @@ def test_execute_request_with_named_formula_metric(loaded_conn):
     assert rows == [(0.4,)]
 
 
+def test_execute_request_with_row_level_helper_derived_metric(loaded_conn):
+    relation = execute_request(
+        loaded_conn,
+        "orders_semantic metrics row_profit_metric / order_revenue as row_margin_pct",
+    )
+    rows = relation.fetchall()
+    assert rows == [(0.4,), (0.4,), (0.4,)]
+
+
 def test_execute_request_with_derived_dimension(loaded_conn):
     relation = execute_request(
         loaded_conn,
