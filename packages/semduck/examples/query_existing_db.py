@@ -9,7 +9,7 @@ from semduck import compile_request, execute_request
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[3]
-    db_path = repo_root / "examples" / "dbt_jaffle_shop" / "jaffle_shop.duckdb"
+    db_path = repo_root / "examples" / "dbt_example" / "jaffle_shop.duckdb"
     request = "orders_semantic dimensions customer_name metrics total_revenue"
 
     conn = duckdb.connect(str(db_path), read_only=True)

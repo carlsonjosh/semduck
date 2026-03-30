@@ -18,6 +18,10 @@ classifiers = [
 ]
 dependencies = [
   "duckdb",
+  "fastmcp>=2,<3",
+  "numpy",
+  "pydantic>=2,<3",
+  "pydantic-ai-slim[openai]>=1,<2",
   "PyYAML",
 ]
 

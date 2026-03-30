@@ -116,6 +116,17 @@ def get_semantic_view(conn: Any, view_name: str) -> SemanticViewRegistry:
     return load_semantic_view_registry(conn, view_name)
 
 
+def list_semantic_views(conn: Any) -> list[str]:
+    rows = conn.execute(
+        """
+        select view_name
+        from semantic.semantic_views
+        order by view_name
+        """
+    ).fetchall()
+    return [row[0] for row in rows]
+
+
 def compile_request(conn: Any, request: str) -> CompiledSemanticQuery:
     return compile_semantic_request(conn, request)
 

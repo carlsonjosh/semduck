@@ -1,0 +1,7 @@
+llm:
+  default_provider: ollama
+  providers:
+    ollama:
+      type: ollama
+      model: gemma3
+      base_url: http://localhost:11434/v1

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-DB_PATH="$ROOT_DIR/examples/dbt_jaffle_shop/jaffle_shop.duckdb"
+DB_PATH="$ROOT_DIR/examples/dbt_example/jaffle_shop.duckdb"
 REQUEST="orders_semantic dimensions customer_name metrics total_revenue"
 
 echo "Database: $DB_PATH"

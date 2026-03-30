@@ -49,6 +49,22 @@ semduck query --db demo.duckdb --request "orders_semantic dimensions region metr
 
 The CLI accepts `--format auto|yaml|ddl` for `check` and `load`. In `auto` mode it uses the file extension or the first non-empty line to infer the format.
 
+Configure an Ollama-backed ask provider and run the ask CLI:
+
+```bash
+semduck ask \
+  --db examples/dbt_example/jaffle_shop.duckdb \
+  --config packages/semduck/examples/ask_ollama_config.yaml \
+  --question "What is total revenue by customer name?" \
+  --sql-only
+```
+
+Start the semduck MCP server over `stdio`:
+
+```bash
+semduck mcp --db examples/dbt_example/jaffle_shop.duckdb
+```
+
 ## Authoring Formats
 
 ### YAML
@@ -175,6 +191,11 @@ The design note for that boundary is in [`project/decisions/remove_yaml_in_dbt_s
 - In-memory Python quickstart: [`examples/quickstart.py`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/quickstart.py)
 - Query an existing database from Python: [`examples/query_existing_db.py`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/query_existing_db.py)
 - Query an existing database from the CLI: [`examples/query_existing_db_cli.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/query_existing_db_cli.sh)
+- Register an Ollama provider config and use `semduck ask`: [`examples/ask_existing_db_cli.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_existing_db_cli.sh)
+- Example Ollama provider config: [`examples/ask_ollama_config.yaml`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_ollama_config.yaml)
+- Start the MCP server over stdio: [`examples/mcp_server_stdio.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/mcp_server_stdio.sh)
+- Example MCP client config: [`examples/mcp_client_config.json`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/mcp_client_config.json)
+- MCP startup and client connection guide: [`examples/mcp_connection_guide.md`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/mcp_connection_guide.md)
 - End-to-end dbt example: [`examples/dbt_example`](https://github.com/carlsonjosh/semduck/tree/main/examples/dbt_example)
 
 ## Development
