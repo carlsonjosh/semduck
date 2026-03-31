@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import pytest
+
 from semduck.llm import (
     LLMConfig,
     ProviderConfig,
+    TaskLLMConfig,
     create_provider_registry,
     load_and_resolve_llm_config,
     load_llm_config,
     resolve_llm_log_dir,
     resolve_llm_config,
+    resolve_llm_task_configs,
 )
 
 
@@ -52,6 +56,36 @@ def test_load_llm_config_reads_log_dir(tmp_path):
     config = load_llm_config(config_path)
 
     assert config.log_dir == ".semduck/llm-logs"
+
+
+def test_load_llm_config_reads_task_specific_models(tmp_path):
+    config_path = tmp_path / "semduck.yaml"
+    config_path.write_text(
+        """
+        llm:
+          default_provider: ollama
+          tasks:
+            ask_plan:
+              provider: ollama
+              model: planner-model
+            ask_summary:
+              provider: local_openai
+              model: summary-model
+          providers:
+            ollama:
+              type: ollama
+              model: llama3.1
+            local_openai:
+              type: openai_compatible
+              model: qwen2.5
+        """,
+        encoding="utf-8",
+    )
+
+    config = load_llm_config(config_path)
+
+    assert config.tasks["ask_plan"] == TaskLLMConfig(provider="ollama", model="planner-model")
+    assert config.tasks["ask_summary"] == TaskLLMConfig(provider="local_openai", model="summary-model")
 
 
 def test_resolve_llm_config_uses_override_precedence():
@@ -110,6 +144,70 @@ def test_resolve_llm_log_dir_uses_override_precedence():
     assert str(resolve_llm_log_dir(config, env={"SEMDUCK_LLM_LOG_DIR": "env-logs"})) == "env-logs"
     assert str(resolve_llm_log_dir(config, log_dir="cli-logs")) == "cli-logs"
     assert resolve_llm_log_dir(config, disable_log=True) is None
+
+
+def test_resolve_llm_task_configs_uses_task_specific_models():
+    config = LLMConfig(
+        default_provider="ollama",
+        default_model="default-model",
+        tasks={
+            "ask_plan": TaskLLMConfig(provider="ollama", model="planner-model"),
+            "ask_summary": TaskLLMConfig(provider="local_openai", model="summary-model"),
+        },
+        providers={
+            "ollama": ProviderConfig(type="ollama", model="ignored-default"),
+            "local_openai": ProviderConfig(type="openai_compatible", model="ignored-summary"),
+        },
+    )
+
+    resolved = resolve_llm_task_configs(config, task_names=("ask_plan", "ask_summary"))
+
+    assert resolved["ask_plan"].provider_name == "ollama"
+    assert resolved["ask_plan"].model == "planner-model"
+    assert resolved["ask_summary"].provider_name == "local_openai"
+    assert resolved["ask_summary"].model == "summary-model"
+
+
+def test_resolve_llm_task_configs_requires_all_declared_tasks():
+    config = LLMConfig(
+        default_provider="ollama",
+        default_model="default-model",
+        tasks={
+            "ask_plan": TaskLLMConfig(provider="ollama", model="planner-model"),
+        },
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        resolve_llm_task_configs(config, task_names=("ask_plan", "ask_summary"))
+
+    assert "Task-specific LLM config must define all required tasks" in str(excinfo.value)
+
+
+def test_resolve_llm_task_configs_uses_global_override_for_all_tasks():
+    config = LLMConfig(
+        default_provider="ollama",
+        default_model="default-model",
+        tasks={
+            "ask_plan": TaskLLMConfig(provider="ollama", model="planner-model"),
+            "ask_summary": TaskLLMConfig(provider="local_openai", model="summary-model"),
+        },
+        providers={
+            "ollama": ProviderConfig(type="ollama", model="llama3.1"),
+            "local_openai": ProviderConfig(type="openai_compatible", model="qwen2.5"),
+        },
+    )
+
+    resolved = resolve_llm_task_configs(
+        config,
+        task_names=("ask_plan", "ask_summary"),
+        provider="ollama",
+        model="override-model",
+    )
+
+    assert resolved["ask_plan"].model == "override-model"
+    assert resolved["ask_summary"].model == "override-model"
+    assert resolved["ask_plan"].provider_name == "ollama"
+    assert resolved["ask_summary"].provider_name == "ollama"
 
 
 def test_load_and_resolve_llm_config_uses_env_provider_override(tmp_path):

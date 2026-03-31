@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, Sequence
 
 import yaml
 from pydantic import BaseModel, Field
@@ -25,10 +25,16 @@ class ProviderConfig(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
+class TaskLLMConfig(BaseModel):
+    provider: str
+    model: str
+
+
 class LLMConfig(BaseModel):
     default_provider: str | None = None
     default_model: str | None = None
     log_dir: str | None = None
+    tasks: dict[str, TaskLLMConfig] = Field(default_factory=dict)
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
 
 
@@ -148,3 +154,56 @@ def resolve_llm_log_dir(
     if not selected_log_dir:
         return None
     return Path(selected_log_dir).expanduser()
+
+
+def resolve_llm_task_configs(
+    config: LLMConfig | None = None,
+    *,
+    task_names: Sequence[str],
+    provider: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, ResolvedLLMConfig]:
+    current = config or LLMConfig()
+
+    if provider is not None or model is not None or base_url is not None or api_key is not None:
+        resolved = resolve_llm_config(
+            current,
+            provider=provider,
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+            env=env,
+        )
+        return {task_name: resolved.model_copy(deep=True) for task_name in task_names}
+
+    if current.tasks:
+        missing_tasks = [task_name for task_name in task_names if task_name not in current.tasks]
+        if missing_tasks:
+            raise ValueError(
+                "Task-specific LLM config must define all required tasks: "
+                + ", ".join(task_names)
+            )
+        return {
+            task_name: resolve_llm_config(
+                current,
+                provider=current.tasks[task_name].provider,
+                model=current.tasks[task_name].model,
+                base_url=base_url,
+                api_key=api_key,
+                env=env,
+            )
+            for task_name in task_names
+        }
+
+    resolved = resolve_llm_config(
+        current,
+        provider=provider,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+        env=env,
+    )
+    return {task_name: resolved.model_copy(deep=True) for task_name in task_names}

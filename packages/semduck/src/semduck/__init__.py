@@ -25,6 +25,8 @@ from semduck.agent import (
     check_definition_service,
     compile_request_service,
     create_ask_agent,
+    create_ask_planner,
+    create_ask_summary_agent,
     describe_semantic_view_service,
     format_ask_result_json,
     format_ask_result_text,
@@ -40,11 +42,13 @@ from semduck.llm import (
     ProviderConfig,
     ProviderRegistry,
     ResolvedLLMConfig,
+    TaskLLMConfig,
     create_provider_registry,
     default_config_path,
     load_and_resolve_llm_config,
     load_llm_config,
     resolve_llm_config,
+    resolve_llm_task_configs,
 )
 from semduck.mcp import build_mcp_server, run_mcp_server
 from semduck.api import (
@@ -131,6 +135,7 @@ __all__ = [
     "ResolvedDerivedMetric",
     "ResolvedLLMConfig",
     "ResolvedMetric",
+    "TaskLLMConfig",
     "SemanticCompileError",
     "SemanticJoin",
     "SemanticJoinDescriptor",
@@ -157,6 +162,8 @@ __all__ = [
     "check_semantic_spec",
     "build_mcp_server",
     "create_ask_agent",
+    "create_ask_planner",
+    "create_ask_summary_agent",
     "create_provider_registry",
     "default_config_path",
     "describe_semantic_view_service",
@@ -180,5 +187,6 @@ __all__ = [
     "query_request_service",
     "register_connection",
     "resolve_llm_config",
+    "resolve_llm_task_configs",
     "run_mcp_server",
 ]

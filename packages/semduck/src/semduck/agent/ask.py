@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 import duckdb
@@ -22,12 +22,26 @@ from semduck.agent.services import (
     query_request_service,
 )
 from semduck.errors import SemanticParseError, SemanticUnsupportedError
-from semduck.llm import create_provider_registry, load_and_resolve_llm_config, resolve_llm_log_dir
+from semduck.llm import (
+    create_provider_registry,
+    load_llm_config,
+    resolve_llm_log_dir,
+    resolve_llm_task_configs,
+)
+from semduck.llm.config import ResolvedLLMConfig
 from semduck.parser.request_parser import parse_request
 
 
+ASK_PLAN_TASK = "ask_plan"
+ASK_SUMMARY_TASK = "ask_summary"
+TEXT_RESULT_ROW_LIMIT = 20
+SQL_PREFIXES = ("select", "with", "insert", "update", "delete")
+MODEL_MESSAGE_ADAPTER = TypeAdapter(ModelMessage)
+NULLISH_WHERE_CLAUSES = {"none", "null", "nil", "n/a", "na"}
+AskProgressReporter = Callable[[str], None]
+
+
 class AskPlan(BaseModel):
-    answer_text: str
     chosen_view: str
     dimensions: list[str] = Field(default_factory=list)
     metrics: list[str] = Field(default_factory=list)
@@ -77,6 +91,8 @@ class AskResult(BaseModel):
     executed: bool
     provider: str
     model: str
+    summary_provider: str | None = None
+    summary_model: str | None = None
     chosen_view: str
     row_limit: int | None = None
     total_row_count: int = 0
@@ -95,43 +111,76 @@ class AskExecutionError(Exception):
 class AskDependencies:
     conn: Any
     requested_view: str | None = None
-    sql_only: bool = False
+
+
+@dataclass
+class AskStageModel:
+    stage: str
+    provider_name: str
+    model_name: str
+    agent_model: Any
 
 
 @dataclass
 class AskAttemptTrace:
+    stage: str
     prompt: str
-    output: AskPlan
+    provider: str
+    model: str
+    output: dict[str, Any]
     messages: list[dict[str, Any]]
     is_retry: bool = False
 
 
-TEXT_RESULT_ROW_LIMIT = 20
-SQL_PREFIXES = ("select", "with", "insert", "update", "delete")
-MODEL_MESSAGE_ADAPTER = TypeAdapter(ModelMessage)
-NULLISH_WHERE_CLAUSES = {"none", "null", "nil", "n/a", "na"}
+def _serialize_output(output: Any) -> dict[str, Any]:
+    if hasattr(output, "model_dump"):
+        return output.model_dump()
+    return {"value": output}
 
 
-def _resolve_agent_model(
+def _emit_progress(progress: AskProgressReporter | None, message: str) -> None:
+    if progress is not None:
+        progress(message)
+
+
+def _resolve_ask_models(
     *,
     config: str | None = None,
     provider: str | None = None,
     model: str | None = None,
     llm_log_dir: str | None = None,
     disable_llm_log: bool = False,
-) -> tuple[str, str, Any, Path | None]:
-    llm_config, resolved = load_and_resolve_llm_config(
-        config,
+) -> tuple[AskStageModel, AskStageModel, Path | None]:
+    llm_config = load_llm_config(config)
+    resolved_tasks = resolve_llm_task_configs(
+        llm_config,
+        task_names=(ASK_PLAN_TASK, ASK_SUMMARY_TASK),
         provider=provider,
         model=model,
     )
-    agent_model = create_provider_registry().build_model(resolved)
+    registry = create_provider_registry()
+    plan_config = resolved_tasks[ASK_PLAN_TASK]
+    summary_config = resolved_tasks[ASK_SUMMARY_TASK]
     log_dir = resolve_llm_log_dir(
         llm_config,
         log_dir=llm_log_dir,
         disable_log=disable_llm_log,
     )
-    return resolved.provider_name, resolved.model, agent_model, log_dir
+    return (
+        AskStageModel(
+            stage=ASK_PLAN_TASK,
+            provider_name=plan_config.provider_name,
+            model_name=plan_config.model,
+            agent_model=registry.build_model(plan_config),
+        ),
+        AskStageModel(
+            stage=ASK_SUMMARY_TASK,
+            provider_name=summary_config.provider_name,
+            model_name=summary_config.model,
+            agent_model=registry.build_model(summary_config),
+        ),
+        log_dir,
+    )
 
 
 def _troubleshooting_for_error(code: str) -> list[str]:
@@ -197,15 +246,21 @@ def _render_semantic_request(plan: AskPlan) -> str:
 
 
 def _run_agent_sync(
-    agent: Agent[AskDependencies, AskPlan],
+    agent: Agent[Any, Any],
     prompt: str,
-    deps: AskDependencies,
-) -> AskAttemptTrace:
+    *,
+    deps: Any,
+    stage_model: AskStageModel,
+) -> tuple[Any, AskAttemptTrace]:
     with capture_run_messages() as messages:
         result = asyncio.run(agent.run(prompt, deps=deps))
-    return AskAttemptTrace(
+    output = result.output
+    return output, AskAttemptTrace(
+        stage=stage_model.stage,
         prompt=prompt,
-        output=result.output,
+        provider=stage_model.provider_name,
+        model=stage_model.model_name,
+        output=_serialize_output(output),
         messages=[MODEL_MESSAGE_ADAPTER.dump_python(message, mode="json") for message in messages],
     )
 
@@ -216,11 +271,14 @@ def _validate_compilable_request(conn: Any, request: str) -> None:
 
 def _ask_with_semantic_retry(
     agent: Agent[AskDependencies, AskPlan],
+    stage_model: AskStageModel,
     question: str,
     deps: AskDependencies,
+    *,
+    progress: AskProgressReporter | None = None,
 ) -> tuple[AskPlan, list[AskAttemptTrace]]:
-    initial_attempt = _run_agent_sync(agent, question, deps)
-    plan = initial_attempt.output
+    _emit_progress(progress, "planning semantic request")
+    plan, initial_attempt = _run_agent_sync(agent, question, deps=deps, stage_model=stage_model)
     try:
         rendered_request = _render_semantic_request(plan)
         _validate_semantic_request(rendered_request)
@@ -229,22 +287,22 @@ def _ask_with_semantic_retry(
     except (ValueError, SemduckServiceError):
         pass
 
+    _emit_progress(progress, "retrying planner after invalid request")
     retry_prompt = (
         f"{question}\n\n"
         "Your previous structured request was invalid. "
         f"chosen_view={plan.chosen_view!r}, dimensions={plan.dimensions!r}, "
         f"metrics={plan.metrics!r}, where_clause={plan.where_clause!r}\n\n"
-        "Retry. Return structured fields, not a free-form semantic_request string. "
+        "Retry. Return structured fields only: chosen_view, dimensions, metrics, and where_clause. "
         "Set chosen_view to the semantic view name. "
         "Put requested dimensions in dimensions, requested metrics in metrics, and any predicate in where_clause. "
-        "Do not include SQL. Do not include ORDER BY, LIMIT, or HAVING. "
+        "Do not include answer text or SQL. Do not include ORDER BY, LIMIT, or HAVING. "
         "The rendered request shape is: "
         "<view_name> dimensions <dimension list> metrics <metric list> where <optional predicate>. "
         "Use semduck tools to inspect views and validate the request before finalizing."
     )
-    retry_attempt = _run_agent_sync(agent, retry_prompt, deps)
+    retry_plan, retry_attempt = _run_agent_sync(agent, retry_prompt, deps=deps, stage_model=stage_model)
     retry_attempt.is_retry = True
-    retry_plan = retry_attempt.output
     try:
         retry_request = _render_semantic_request(retry_plan)
         _validate_semantic_request(retry_request)
@@ -266,6 +324,64 @@ def _ask_with_semantic_retry(
     return retry_plan, [initial_attempt, retry_attempt]
 
 
+def _build_summary_prompt(
+    *,
+    question: str,
+    semantic_request: str,
+    sql: str,
+    columns: list[str],
+    rows: list[list[Any]],
+    total_row_count: int,
+    omitted_row_count: int,
+) -> str:
+    payload = {
+        "question": question,
+        "semantic_request": semantic_request,
+        "sql": sql,
+        "columns": columns,
+        "rows": rows,
+        "total_row_count": total_row_count,
+        "omitted_row_count": omitted_row_count,
+    }
+    return json.dumps(payload, indent=2, default=str)
+
+
+def _summarize_results(
+    agent: Agent[None, str],
+    stage_model: AskStageModel,
+    *,
+    question: str,
+    semantic_request: str,
+    sql: str,
+    columns: list[str],
+    rows: list[list[Any]],
+    total_row_count: int,
+    omitted_row_count: int,
+) -> tuple[str, list[AskAttemptTrace]]:
+    prompt = _build_summary_prompt(
+        question=question,
+        semantic_request=semantic_request,
+        sql=sql,
+        columns=columns,
+        rows=rows,
+        total_row_count=total_row_count,
+        omitted_row_count=omitted_row_count,
+    )
+    summary, attempt = _run_agent_sync(agent, prompt, deps=None, stage_model=stage_model)
+    summary = str(summary).strip()
+    if not summary:
+        raise AskExecutionError(
+            code="runtime",
+            message="Summary model returned an empty answer",
+            troubleshooting=_troubleshooting_for_error("runtime"),
+        )
+    return summary, [attempt]
+
+
+def _deterministic_sql_only_answer(semantic_request: str) -> str:
+    return f"Prepared semantic request without executing it: {semantic_request}"
+
+
 def _build_llm_trace_path(log_dir: Path) -> Path:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     return log_dir / f"ask-{timestamp}-{uuid4().hex}.jsonl"
@@ -274,8 +390,6 @@ def _build_llm_trace_path(log_dir: Path) -> Path:
 def _write_llm_trace(
     *,
     log_dir: Path | None,
-    provider: str,
-    model: str,
     question: str,
     view: str | None,
     execute: bool,
@@ -291,8 +405,6 @@ def _write_llm_trace(
     trace_path = _build_llm_trace_path(log_dir)
     base_record = {
         "timestamp": datetime.now(UTC).isoformat(),
-        "provider": provider,
-        "model": model,
         "question": question,
         "requested_view": view,
         "execute": execute,
@@ -303,12 +415,14 @@ def _write_llm_trace(
         for index, attempt in enumerate(attempts, start=1):
             record = {
                 **base_record,
-                "event": "llm_attempt",
+                "event": f"{attempt.stage}_attempt",
                 "attempt": index,
                 "is_retry": attempt.is_retry,
+                "provider": attempt.provider,
+                "model": attempt.model,
                 "prompt": attempt.prompt,
                 "messages": attempt.messages,
-                "plan": attempt.output.model_dump(),
+                "output": attempt.output,
             }
             handle.write(json.dumps(record, ensure_ascii=True) + "\n")
 
@@ -342,19 +456,18 @@ def _write_llm_trace(
             )
 
 
-def create_ask_agent(model: Any) -> Agent[AskDependencies, AskPlan]:
+def create_ask_planner(model: Any) -> Agent[AskDependencies, AskPlan]:
     agent = Agent(
         model,
         deps_type=AskDependencies,
         output_type=AskPlan,
         system_prompt=(
             "You translate analytics questions into semduck semantic requests. "
-            "Do not invent arbitrary SQL as the primary answer. "
             "Use the available semduck tools to inspect semantic views before choosing a request. "
             "Verify dimensions and metrics against describe_semantic_view before finalizing a request. "
-            "If you use compile or query tools, use them only with semduck requests. "
-            "Return structured output fields: chosen_view, dimensions, metrics, where_clause, and answer_text. "
-            "Do not put a whole semantic request or SQL string into one field. "
+            "If you use compile tools, use them only with semduck requests. "
+            "Return structured output fields: chosen_view, dimensions, metrics, and where_clause. "
+            "Do not return answer text, summaries, or SQL. "
             "The semantic request grammar is: <view_name> dimensions <dimension list> metrics <metric list> "
             "where <optional predicate>. Only dimensions, metrics, and optional where are supported. "
             "Never include SQL clauses like ORDER BY, LIMIT, GROUP BY, HAVING, or raw SELECT statements. "
@@ -375,15 +488,6 @@ def create_ask_agent(model: Any) -> Agent[AskDependencies, AskPlan]:
             "If multiple semantic views exist, inspect them and choose the most relevant one. "
             "If no semantic views are available, do not fabricate a request; explain that the registry needs to be loaded."
         )
-
-    @agent.system_prompt
-    def sql_only_instructions(ctx: RunContext[AskDependencies]) -> str:
-        if ctx.deps.sql_only:
-            return (
-                "This run is SQL-only. Do not execute queries for the final answer. "
-                "You may inspect views and validate a semantic request, but final output should assume no query execution."
-            )
-        return "Query execution is allowed if it helps you answer accurately."
 
     @agent.tool
     def list_semantic_views(ctx: RunContext[AskDependencies]) -> list[str]:
@@ -406,17 +510,26 @@ def create_ask_agent(model: Any) -> Agent[AskDependencies, AskPlan]:
             CompileRequestArgs(request=request),
         ).model_dump()
 
-    @agent.tool
-    def query_semantic_request(ctx: RunContext[AskDependencies], request: str) -> dict[str, Any]:
-        """Execute a semduck semantic request and return SQL plus tabular results."""
-        if ctx.deps.sql_only:
-            raise ValueError("query_semantic_request is unavailable during sql-only runs")
-        return query_request_service(
-            ctx.deps.conn,
-            QueryRequestArgs(request=request),
-        ).model_dump()
-
     return agent
+
+
+def create_ask_summary_agent(model: Any) -> Agent[None, str]:
+    return Agent(
+        model,
+        output_type=str,
+        system_prompt=(
+            "You summarize executed semduck query results for analytics questions. "
+            "Use only the provided question, semantic request, SQL, columns, and rows. "
+            "Do not invent rows, aggregations, or facts that are not present in the payload. "
+            "If omitted_row_count is greater than zero, mention that the answer is based on truncated results. "
+            "If there are no rows, say that no matching rows were returned. "
+            "Return only the final answer text."
+        ),
+    )
+
+
+def create_ask_agent(model: Any) -> Agent[AskDependencies, AskPlan]:
+    return create_ask_planner(model)
 
 
 def _connect_if_needed(conn_or_db: Any) -> tuple[Any, bool]:
@@ -438,24 +551,24 @@ def ask_question(
     row_limit: int | None = None,
     llm_log_dir: str | None = None,
     disable_llm_log: bool = False,
+    progress: AskProgressReporter | None = None,
 ) -> AskResult:
     attempts: list[AskAttemptTrace] = []
     resolved_log_dir: Path | None = None
     try:
-        resolved_model = _resolve_agent_model(
+        _emit_progress(progress, "resolving ask configuration")
+        plan_stage, summary_stage, resolved_log_dir = _resolve_ask_models(
             config=config,
             provider=provider,
             model=model,
             llm_log_dir=llm_log_dir,
             disable_llm_log=disable_llm_log,
         )
-        if len(resolved_model) == 3:
-            provider_name, model_name, agent_model = resolved_model
-        else:
-            provider_name, model_name, agent_model, resolved_log_dir = resolved_model
-        agent = create_ask_agent(agent_model)
+        planner = create_ask_planner(plan_stage.agent_model)
+        summary_agent = create_ask_summary_agent(summary_stage.agent_model)
         conn, should_close = _connect_if_needed(conn_or_db)
     except (ValueError, FileNotFoundError) as exc:
+        _emit_progress(progress, "failed")
         raise AskExecutionError(
             code="configuration",
             message=str(exc),
@@ -470,17 +583,29 @@ def ask_question(
             deps = AskDependencies(
                 conn=conn,
                 requested_view=view,
-                sql_only=not execute,
             )
-            plan, attempts = _ask_with_semantic_retry(agent, question, deps)
+            plan, plan_attempts = _ask_with_semantic_retry(
+                planner,
+                plan_stage,
+                question,
+                deps,
+                progress=progress,
+            )
+            attempts.extend(plan_attempts)
             semantic_request = _render_semantic_request(plan)
 
+            _emit_progress(progress, "compiling semantic request")
             compiled = compile_request_service(conn, CompileRequestArgs(request=semantic_request))
             columns: list[str] = []
             rows: list[list[Any]] = []
             total_row_count = 0
             omitted_row_count = 0
+            answer_text = _deterministic_sql_only_answer(semantic_request)
+            summary_provider: str | None = None
+            summary_model: str | None = None
+
             if execute:
+                _emit_progress(progress, "executing semantic request")
                 query_result = query_request_service(conn, QueryRequestArgs(request=semantic_request))
                 columns = query_result.columns
                 total_row_count = len(query_result.rows)
@@ -489,16 +614,36 @@ def ask_question(
                     omitted_row_count = max(total_row_count - len(rows), 0)
                 else:
                     rows = query_result.rows
+                _emit_progress(progress, "summarizing results")
+                summary, summary_attempts = _summarize_results(
+                    summary_agent,
+                    summary_stage,
+                    question=question,
+                    semantic_request=semantic_request,
+                    sql=compiled.sql,
+                    columns=columns,
+                    rows=rows,
+                    total_row_count=total_row_count,
+                    omitted_row_count=omitted_row_count,
+                )
+                attempts.extend(summary_attempts)
+                answer_text = summary
+                summary_provider = summary_stage.provider_name
+                summary_model = summary_stage.model_name
+            else:
+                _emit_progress(progress, "skipping execution (--sql-only)")
 
             result = AskResult(
-                answer_text=plan.answer_text,
+                answer_text=answer_text,
                 semantic_request=semantic_request,
                 sql=compiled.sql,
                 columns=columns,
                 rows=rows,
                 executed=execute,
-                provider=provider_name,
-                model=model_name,
+                provider=plan_stage.provider_name,
+                model=plan_stage.model_name,
+                summary_provider=summary_provider,
+                summary_model=summary_model,
                 chosen_view=compiled.semantic_view_ref,
                 row_limit=row_limit,
                 total_row_count=total_row_count,
@@ -506,8 +651,6 @@ def ask_question(
             )
             _write_llm_trace(
                 log_dir=resolved_log_dir,
-                provider=provider_name,
-                model=model_name,
                 question=question,
                 view=view,
                 execute=execute,
@@ -515,12 +658,12 @@ def ask_question(
                 attempts=attempts,
                 result=result,
             )
+            _emit_progress(progress, "finished")
             return result
         except AskExecutionError as exc:
+            _emit_progress(progress, "failed")
             _write_llm_trace(
                 log_dir=resolved_log_dir,
-                provider=provider_name,
-                model=model_name,
                 question=question,
                 view=view,
                 execute=execute,
@@ -530,6 +673,7 @@ def ask_question(
             )
             raise
         except Exception as exc:
+            _emit_progress(progress, "failed")
             if hasattr(exc, "detail") and hasattr(exc.detail, "code"):
                 code = exc.detail.code
                 troubleshooting = _troubleshooting_for_error(code)
@@ -543,8 +687,6 @@ def ask_question(
             )
             _write_llm_trace(
                 log_dir=resolved_log_dir,
-                provider=provider_name,
-                model=model_name,
                 question=question,
                 view=view,
                 execute=execute,
@@ -564,10 +706,19 @@ def format_ask_result_text(result: AskResult) -> str:
         f"View: {result.chosen_view}",
         f"Provider: {result.provider}",
         f"Model: {result.model}",
-        f"Request: {result.semantic_request}",
-        "SQL:",
-        result.sql,
     ]
+    summary_provider = getattr(result, "summary_provider", None)
+    summary_model = getattr(result, "summary_model", None)
+    if summary_provider and summary_model:
+        lines.append(f"Summary Provider: {summary_provider}")
+        lines.append(f"Summary Model: {summary_model}")
+    lines.extend(
+        [
+            f"Request: {result.semantic_request}",
+            "SQL:",
+            result.sql,
+        ]
+    )
     if result.executed:
         lines.append("Results:")
         if result.columns:

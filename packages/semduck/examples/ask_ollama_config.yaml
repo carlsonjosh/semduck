@@ -1,6 +1,14 @@
 llm:
   default_provider: ollama
   log_dir: .semduck/llm-logs
+  # To use different models for planning and result summarization, define both tasks:
+  tasks:
+    ask_plan:
+      provider: ollama
+      model: qwen3.5:9b
+    ask_summary:
+      provider: ollama
+      model: gemma3n
   providers:
     ollama:
       type: ollama

@@ -4,6 +4,8 @@ from semduck.agent.ask import (
     AskResult,
     ask_question,
     create_ask_agent,
+    create_ask_planner,
+    create_ask_summary_agent,
     format_ask_result_json,
     format_ask_result_text,
 )
@@ -63,6 +65,8 @@ __all__ = [
     "ServiceErrorDetail",
     "check_definition_service",
     "create_ask_agent",
+    "create_ask_planner",
+    "create_ask_summary_agent",
     "compile_request_service",
     "describe_semantic_view_service",
     "format_ask_result_json",

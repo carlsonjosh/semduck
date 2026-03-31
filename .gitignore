@@ -7,6 +7,7 @@ dbt_packages/
 logs/
 target/
 *.duckdb
+.semduck/
 !examples/dbt_jaffle_shop/jaffle_shop.duckdb
 examples/test_fixtures/dbt_project/dbt_packages/
 examples/test_fixtures/dbt_project/logs/

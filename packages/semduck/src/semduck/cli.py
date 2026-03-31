@@ -12,6 +12,10 @@ from semduck.agent.services import SemduckServiceError
 from semduck.errors import SemanticViewError
 
 
+def _print_ask_status(message: str) -> None:
+    print(f"status: {message}", file=sys.stderr)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="semduck")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -148,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
                     row_limit=args.row_limit,
                     llm_log_dir=args.llm_log_dir,
                     disable_llm_log=args.no_llm_log,
+                    progress=_print_ask_status,
                 )
                 if args.output_format == "json":
                     print(format_ask_result_json(result))
