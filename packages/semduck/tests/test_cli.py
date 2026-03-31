@@ -74,3 +74,39 @@ def test_cli_ask_prints_json_output(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert code == 0
     assert '"answer_text": "US revenue is 250.0"' in captured.out
+
+
+def test_cli_ask_passes_llm_logging_options(monkeypatch):
+    captured_kwargs = {}
+
+    monkeypatch.setattr(
+        "semduck.cli.ask_question",
+        lambda *args, **kwargs: captured_kwargs.update(kwargs) or SimpleNamespace(
+            answer_text="US revenue is 250.0",
+            chosen_view="orders_semantic",
+            provider="ollama",
+            model="llama3.1",
+            semantic_request="orders_semantic dimensions region metrics total_revenue where region = 'US'",
+            sql="select 1",
+            executed=False,
+            columns=[],
+            rows=[],
+        ),
+    )
+
+    code = main(
+        [
+            "ask",
+            "--db",
+            ":memory:",
+            "--question",
+            "What is US revenue?",
+            "--llm-log-dir",
+            "trace-logs",
+            "--no-llm-log",
+        ]
+    )
+
+    assert code == 0
+    assert captured_kwargs["llm_log_dir"] == "trace-logs"
+    assert captured_kwargs["disable_llm_log"] is True

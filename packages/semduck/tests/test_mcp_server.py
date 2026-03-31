@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
+
+import yaml
 
 from semduck.mcp import build_mcp_server
 
@@ -39,18 +42,21 @@ def test_build_mcp_server_does_not_register_ask_tool():
 
 
 def test_registry_resource_mentions_configured_defaults():
+    config_path = "packages/semduck/examples/ask_ollama_config.yaml"
     server = build_mcp_server(
         db_path=":memory:",
-        config_path="packages/semduck/examples/ask_ollama_config.yaml",
+        config_path=config_path,
     )
 
     resource = asyncio.run(server.get_resource("semduck://registry"))
     content = asyncio.run(resource.read())
+    config = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
+    model = config["llm"]["providers"]["ollama"]["model"]
 
     assert "Available semantic views:" in content
     assert "- none loaded" in content
     assert "provider=ollama" in content
-    assert "model=gemma3" in content
+    assert f"model={model}" in content
 
 
 def test_ask_prompt_contains_expected_workflow_steps():

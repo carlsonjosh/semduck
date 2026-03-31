@@ -28,6 +28,7 @@ class ProviderConfig(BaseModel):
 class LLMConfig(BaseModel):
     default_provider: str | None = None
     default_model: str | None = None
+    log_dir: str | None = None
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
 
 
@@ -129,3 +130,21 @@ def resolve_llm_config(
         api_key_env=resolved_api_key_env,
         options=config_options,
     )
+
+
+def resolve_llm_log_dir(
+    config: LLMConfig | None = None,
+    *,
+    log_dir: str | None = None,
+    disable_log: bool = False,
+    env: Mapping[str, str] | None = None,
+) -> Path | None:
+    if disable_log:
+        return None
+
+    values = env or os.environ
+    current = config or LLMConfig()
+    selected_log_dir = log_dir or values.get("SEMDUCK_LLM_LOG_DIR") or current.log_dir
+    if not selected_log_dir:
+        return None
+    return Path(selected_log_dir).expanduser()

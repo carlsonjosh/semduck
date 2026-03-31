@@ -55,6 +55,7 @@ Configure an Ollama-backed ask provider and run the ask CLI:
 semduck ask \
   --db examples/dbt_example/jaffle_shop.duckdb \
   --config packages/semduck/examples/ask_ollama_config.yaml \
+  --llm-log-dir .semduck/llm-logs \
   --question "What is total revenue by customer name?" \
   --sql-only
 ```
@@ -65,9 +66,12 @@ Configure an OpenAI-compatible local server and run the ask CLI:
 semduck ask \
   --db examples/dbt_example/jaffle_shop.duckdb \
   --config packages/semduck/examples/ask_openai_compatible_config.yaml \
+  --llm-log-dir .semduck/llm-logs \
   --question "What is total revenue by customer name?" \
   --sql-only
 ```
+
+Set `llm.log_dir` in the config file to enable persistent trace logging by default, or use `--llm-log-dir` to override it per run. Pass `--no-llm-log` to disable logging even when the config file specifies a directory.
 
 Start the semduck MCP server over `stdio`:
 

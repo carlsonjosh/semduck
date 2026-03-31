@@ -1,7 +1,9 @@
 llm:
   default_provider: ollama
+  log_dir: .semduck/llm-logs
   providers:
     ollama:
       type: ollama
-      model: gemma3
+      model: qwen3.5:9b
+      # model: lfm2.5-thinking
       base_url: http://localhost:11434/v1

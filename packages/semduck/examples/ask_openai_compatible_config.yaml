@@ -1,5 +1,6 @@
 llm:
   default_provider: local_openai
+  # log_dir: .semduck/llm-logs
   providers:
     local_openai:
       type: openai_compatible

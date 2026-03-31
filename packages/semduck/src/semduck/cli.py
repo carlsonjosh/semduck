@@ -47,6 +47,8 @@ def build_parser() -> argparse.ArgumentParser:
     ask_cmd.add_argument("--view")
     ask_cmd.add_argument("--sql-only", action="store_true")
     ask_cmd.add_argument("--row-limit", type=int)
+    ask_cmd.add_argument("--llm-log-dir")
+    ask_cmd.add_argument("--no-llm-log", action="store_true")
     ask_cmd.add_argument("--output-format", choices=["text", "json"], default="text")
 
     mcp_cmd = subparsers.add_parser("mcp")
@@ -144,6 +146,8 @@ def main(argv: list[str] | None = None) -> int:
                     view=args.view,
                     execute=not args.sql_only,
                     row_limit=args.row_limit,
+                    llm_log_dir=args.llm_log_dir,
+                    disable_llm_log=args.no_llm_log,
                 )
                 if args.output_format == "json":
                     print(format_ask_result_json(result))

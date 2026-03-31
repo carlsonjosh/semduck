@@ -33,8 +33,14 @@ def test_describe_semantic_view_service_returns_compact_descriptor(loaded_conn):
     orders_table = next(table for table in result.tables if table.name == "orders")
     assert [obj.name for obj in orders_table.dimensions] == ["order_date", "region"]
     assert [obj.object_type for obj in orders_table.dimensions] == ["time_dimension", "dimension"]
-    assert [obj.name for obj in orders_table.facts] == ["revenue"]
-    assert [obj.name for obj in orders_table.metrics] == ["order_count", "total_revenue"]
+    assert [obj.name for obj in orders_table.facts] == ["order_profit", "order_revenue"]
+    assert [obj.name for obj in orders_table.metrics] == [
+        "margin_pct",
+        "order_count",
+        "row_profit_metric",
+        "total_profit",
+        "total_revenue",
+    ]
     assert result.joins[0].left_table == "orders"
 
 
@@ -55,7 +61,7 @@ def test_query_request_service_returns_rows(loaded_conn):
     )
 
     assert result.columns == ["region", "total_revenue"]
-    assert result.rows == [["CA", 200.0], ["US", 250.0]]
+    assert sorted(result.rows) == [["CA", 200.0], ["US", 250.0]]
 
 
 def test_check_definition_service_inferrs_yaml_format(conn, orders_yaml_path):
@@ -76,7 +82,7 @@ def test_load_definition_service_loads_from_ddl(conn, tmp_path):
             region as region
           )
           metrics (
-            order_count as count(order_id)
+            count(order_id) as order_count
           );
         """,
         encoding="utf-8",

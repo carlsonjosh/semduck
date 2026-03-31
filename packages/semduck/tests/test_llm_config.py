@@ -6,6 +6,7 @@ from semduck.llm import (
     create_provider_registry,
     load_and_resolve_llm_config,
     load_llm_config,
+    resolve_llm_log_dir,
     resolve_llm_config,
 )
 
@@ -29,7 +30,28 @@ def test_load_llm_config_reads_yaml_shape(tmp_path):
     config = load_llm_config(config_path)
 
     assert config.default_provider == "ollama"
+    assert config.log_dir is None
     assert config.providers["ollama"].base_url == "http://localhost:11434/v1"
+
+
+def test_load_llm_config_reads_log_dir(tmp_path):
+    config_path = tmp_path / "semduck.yaml"
+    config_path.write_text(
+        """
+        llm:
+          default_provider: ollama
+          log_dir: .semduck/llm-logs
+          providers:
+            ollama:
+              type: ollama
+              model: llama3.1
+        """,
+        encoding="utf-8",
+    )
+
+    config = load_llm_config(config_path)
+
+    assert config.log_dir == ".semduck/llm-logs"
 
 
 def test_resolve_llm_config_uses_override_precedence():
@@ -79,6 +101,15 @@ def test_resolve_llm_config_uses_env_for_api_key_reference():
 
     assert resolved.provider_type == "openai_compatible"
     assert resolved.api_key == "secret-key"
+
+
+def test_resolve_llm_log_dir_uses_override_precedence():
+    config = LLMConfig(log_dir=".semduck/default-logs")
+
+    assert str(resolve_llm_log_dir(config)) == ".semduck/default-logs"
+    assert str(resolve_llm_log_dir(config, env={"SEMDUCK_LLM_LOG_DIR": "env-logs"})) == "env-logs"
+    assert str(resolve_llm_log_dir(config, log_dir="cli-logs")) == "cli-logs"
+    assert resolve_llm_log_dir(config, disable_log=True) is None
 
 
 def test_load_and_resolve_llm_config_uses_env_provider_override(tmp_path):
