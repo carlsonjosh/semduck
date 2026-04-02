@@ -6,8 +6,14 @@ from pathlib import Path
 
 import duckdb
 
+from semduck.agent import AskExecutionError, ask_question, format_ask_result_json, format_ask_result_text
 from semduck.api import compile_request, init_registry, load_semantic_ddl_file, load_semantic_yaml_file
+from semduck.agent.services import SemduckServiceError
 from semduck.errors import SemanticViewError
+
+
+def _print_ask_status(message: str) -> None:
+    print(f"status: {message}", file=sys.stderr)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,6 +42,28 @@ def build_parser() -> argparse.ArgumentParser:
     query_cmd.add_argument("--db", required=True)
     query_cmd.add_argument("--request", required=True)
 
+    ask_cmd = subparsers.add_parser("ask")
+    ask_cmd.add_argument("--db", required=True)
+    ask_cmd.add_argument("--question", required=True)
+    ask_cmd.add_argument("--config")
+    ask_cmd.add_argument("--provider")
+    ask_cmd.add_argument("--model")
+    ask_cmd.add_argument("--view")
+    ask_cmd.add_argument("--sql", action="store_true")
+    ask_cmd.add_argument("--table", action="store_true")
+    ask_cmd.add_argument("--csv", action="store_true")
+    ask_cmd.add_argument("--summary", action="store_true")
+    ask_cmd.add_argument("--row-limit", type=int)
+    ask_cmd.add_argument("--llm-log-dir")
+    ask_cmd.add_argument("--no-llm-log", action="store_true")
+    ask_cmd.add_argument("--output-format", choices=["text", "json"], default="text")
+
+    mcp_cmd = subparsers.add_parser("mcp")
+    mcp_cmd.add_argument("--db", required=True)
+    mcp_cmd.add_argument("--config")
+    mcp_cmd.add_argument("--provider")
+    mcp_cmd.add_argument("--model")
+
     return parser
 
 
@@ -63,6 +91,17 @@ def _infer_definition_format(path: str, explicit_format: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.command == "mcp":
+        from semduck.mcp import run_mcp_server
+
+        run_mcp_server(
+            db_path=args.db,
+            config_path=args.config,
+            provider=args.provider,
+            model=args.model,
+        )
+        return 0
 
     try:
         with _connect(args.db) as conn:
@@ -104,7 +143,39 @@ def main(argv: list[str] | None = None) -> int:
                 for row in rows:
                     print(" | ".join("" if value is None else str(value) for value in row))
                 return 0
+            if args.command == "ask":
+                result = ask_question(
+                    conn,
+                    args.question,
+                    config=args.config,
+                    provider=args.provider,
+                    model=args.model,
+                    view=args.view,
+                    row_limit=args.row_limit,
+                    llm_log_dir=args.llm_log_dir,
+                    disable_llm_log=args.no_llm_log,
+                    include_sql=args.sql,
+                    include_table=args.table,
+                    include_csv=args.csv,
+                    include_summary=args.summary,
+                    progress=_print_ask_status,
+                )
+                if args.output_format == "json":
+                    print(format_ask_result_json(result))
+                else:
+                    print(format_ask_result_text(result))
+                return 0
     except SemanticViewError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except AskExecutionError as exc:
+        print(f"error[{exc.code}]: {exc.message}", file=sys.stderr)
+        if exc.troubleshooting:
+            print("troubleshooting:", file=sys.stderr)
+            for item in exc.troubleshooting:
+                print(f"- {item}", file=sys.stderr)
+        return 1
+    except (SemduckServiceError, ValueError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

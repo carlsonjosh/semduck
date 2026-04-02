@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "semduck": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "semduck.cli",
+        "mcp",
+        "--db",
+        "/absolute/path/to/semduck/examples/dbt_example/jaffle_shop.duckdb"
+      ]
+    },
+    "semduck_with_llm_defaults": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "semduck.cli",
+        "mcp",
+        "--db",
+        "/absolute/path/to/semduck/examples/dbt_example/jaffle_shop.duckdb",
+        "--config",
+        "/absolute/path/to/semduck/packages/semduck/examples/ask_ollama_config.yaml"
+      ]
+    }
+  }
+}
