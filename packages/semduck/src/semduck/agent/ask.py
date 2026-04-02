@@ -307,7 +307,7 @@ def _render_semantic_request(plan: AskPlan) -> str:
     return " ".join(parts)
 
 
-def _run_agent_sync(
+async def _run_agent(
     agent: Agent[Any, Any],
     prompt: str,
     *,
@@ -318,7 +318,7 @@ def _run_agent_sync(
     started_perf = perf_counter()
     with capture_run_messages() as messages:
         try:
-            result = asyncio.run(agent.run(prompt, deps=deps))
+            result = await agent.run(prompt, deps=deps)
         except Exception as exc:
             finished_at = datetime.now(UTC).isoformat()
             duration_ms = int((perf_counter() - started_perf) * 1000)
@@ -391,7 +391,7 @@ def _normalize_requested_outputs(
     return requested_outputs
 
 
-def _ask_with_semantic_retry(
+async def _ask_with_semantic_retry(
     agent: Agent[AskDependencies, AskPlan],
     stage_model: AskStageModel,
     question: str,
@@ -402,7 +402,7 @@ def _ask_with_semantic_retry(
     attempts: list[AskAttemptTrace] = []
     _emit_progress(progress, "planning semantic request")
     try:
-        plan, initial_attempt = _run_agent_sync(agent, question, deps=deps, stage_model=stage_model)
+        plan, initial_attempt = await _run_agent(agent, question, deps=deps, stage_model=stage_model)
     except AskAgentRunError as exc:
         attempts.append(exc.attempt)
         raise AskExecutionError(
@@ -451,7 +451,7 @@ def _ask_with_semantic_retry(
         "  where_clause = null"
     )
     try:
-        retry_plan, retry_attempt = _run_agent_sync(agent, retry_prompt, deps=deps, stage_model=stage_model)
+        retry_plan, retry_attempt = await _run_agent(agent, retry_prompt, deps=deps, stage_model=stage_model)
     except AskAgentRunError as exc:
         exc.attempt.is_retry = True
         attempts.append(exc.attempt)
@@ -510,10 +510,14 @@ def _build_summary_prompt(
         "total_row_count": total_row_count,
         "omitted_row_count": omitted_row_count,
     }
-    return json.dumps(payload, indent=2, default=str)
+    return _json_dumps(payload, indent=2)
 
 
-def _summarize_results(
+def _json_dumps(payload: Any, *, indent: int | None = None, ensure_ascii: bool = True) -> str:
+    return json.dumps(payload, indent=indent, ensure_ascii=ensure_ascii, default=str)
+
+
+async def _summarize_results(
     agent: Agent[None, str],
     stage_model: AskStageModel,
     *,
@@ -535,7 +539,7 @@ def _summarize_results(
         omitted_row_count=omitted_row_count,
     )
     try:
-        summary, attempt = _run_agent_sync(agent, prompt, deps=None, stage_model=stage_model)
+        summary, attempt = await _run_agent(agent, prompt, deps=None, stage_model=stage_model)
     except AskAgentRunError as exc:
         raise AskExecutionError(
             code="runtime",
@@ -605,23 +609,22 @@ def _write_llm_trace(
                 "messages": attempt.messages,
                 "output": attempt.output,
             }
-            handle.write(json.dumps(record, ensure_ascii=True) + "\n")
+            handle.write(_json_dumps(record, ensure_ascii=True) + "\n")
 
         if result is not None:
             handle.write(
-                json.dumps(
+                _json_dumps(
                     {
                         **base_record,
                         "event": "ask_result",
                         "result": result.model_dump(),
                     },
-                    ensure_ascii=True,
                 )
                 + "\n"
             )
         if failure is not None:
             handle.write(
-                json.dumps(
+                _json_dumps(
                     {
                         **base_record,
                         "event": "ask_error",
@@ -632,7 +635,6 @@ def _write_llm_trace(
                             "troubleshooting": failure.troubleshooting,
                         },
                     },
-                    ensure_ascii=True,
                 )
                 + "\n"
             )
@@ -747,7 +749,7 @@ def _connect_if_needed(conn_or_db: Any) -> tuple[Any, bool]:
     return duckdb.connect(path), True
 
 
-def ask_question(
+async def ask_question_async(
     conn_or_db: Any,
     question: str,
     *,
@@ -803,7 +805,7 @@ def ask_question(
                 conn=conn,
                 requested_view=view,
             )
-            plan, plan_attempts = _ask_with_semantic_retry(
+            plan, plan_attempts = await _ask_with_semantic_retry(
                 planner,
                 plan_stage,
                 question,
@@ -830,6 +832,16 @@ def ask_question(
                     troubleshooting=_troubleshooting_for_error(exc.detail.code),
                     failure_stage="compile",
                 ) from exc
+            if view is not None and compiled.semantic_view_ref != view:
+                raise AskExecutionError(
+                    code="registry",
+                    message=(
+                        f"Ask planner selected semantic view {compiled.semantic_view_ref!r}, "
+                        f"but {view!r} was explicitly requested."
+                    ),
+                    troubleshooting=_troubleshooting_for_error("registry"),
+                    failure_stage="compile",
+                )
             columns: list[str] = []
             rows: list[list[Any]] = []
             total_row_count = 0
@@ -865,7 +877,7 @@ def ask_question(
                             troubleshooting=_troubleshooting_for_error("configuration"),
                             failure_stage=ASK_SUMMARY_TASK,
                         )
-                    summary, summary_attempts = _summarize_results(
+                    summary, summary_attempts = await _summarize_results(
                         summary_agent,
                         summary_stage,
                         question=question,
@@ -954,6 +966,49 @@ def ask_question(
             conn.close()
 
 
+def ask_question(
+    conn_or_db: Any,
+    question: str,
+    *,
+    config: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+    view: str | None = None,
+    row_limit: int | None = None,
+    llm_log_dir: str | None = None,
+    disable_llm_log: bool = False,
+    include_sql: bool = False,
+    include_table: bool = False,
+    include_csv: bool = False,
+    include_summary: bool = False,
+    progress: AskProgressReporter | None = None,
+) -> AskResult:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(
+            ask_question_async(
+                conn_or_db,
+                question,
+                config=config,
+                provider=provider,
+                model=model,
+                view=view,
+                row_limit=row_limit,
+                llm_log_dir=llm_log_dir,
+                disable_llm_log=disable_llm_log,
+                include_sql=include_sql,
+                include_table=include_table,
+                include_csv=include_csv,
+                include_summary=include_summary,
+                progress=progress,
+            )
+        )
+    raise RuntimeError(
+        "ask_question() cannot be used from an active event loop; use await ask_question_async(...) instead."
+    )
+
+
 def format_ask_result_text(result: AskResult) -> str:
     requested_outputs = getattr(result, "requested_outputs", None) or list(DEFAULT_ASK_OUTPUTS)
     sections: list[tuple[str, str]] = []
@@ -975,7 +1030,7 @@ def format_ask_result_text(result: AskResult) -> str:
 
 
 def format_ask_result_json(result: AskResult) -> str:
-    return json.dumps(result.model_dump(), indent=2)
+    return _json_dumps(result.model_dump(), indent=2, ensure_ascii=False)
 
 
 def _format_result_table(result: AskResult) -> str:

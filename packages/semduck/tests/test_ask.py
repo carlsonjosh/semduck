@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+from datetime import date
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
 
 from semduck.agent.models import ServiceErrorDetail
 from semduck.agent.services import SemduckServiceError
-from semduck.agent import AskExecutionError, AskPlan, ask_question, format_ask_result_text
+from semduck.agent import AskExecutionError, AskPlan, ask_question, ask_question_async, format_ask_result_json, format_ask_result_text
 from semduck.agent.ask import AskStageModel
 
 
@@ -95,6 +97,68 @@ def test_ask_question_executes_compiled_request(loaded_conn, monkeypatch):
     assert result.rows == [["US", 250.0]]
     assert result.answer_text == "US revenue is 250.0"
     assert result.requested_outputs == ["summary"]
+
+
+@pytest.mark.anyio
+async def test_ask_question_async_executes_compiled_request(loaded_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            None,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+
+    result = await ask_question_async(loaded_conn, "Show revenue by region")
+
+    assert result.executed is True
+    assert result.columns == ["region", "total_revenue"]
+
+
+@pytest.mark.anyio
+async def test_ask_question_raises_clear_error_in_active_event_loop(loaded_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            None,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        ask_question(loaded_conn, "Show revenue by region")
+
+    assert "ask_question_async" in str(exc_info.value)
 
 
 def test_ask_question_executes_request_only_once(loaded_conn, monkeypatch):
@@ -772,6 +836,50 @@ def test_ask_question_combines_sql_and_csv_without_summary(loaded_conn, monkeypa
     assert result.summary_model is None
 
 
+def test_ask_question_enforces_explicit_requested_view(loaded_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan"),
+            None,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.compile_request_service",
+        lambda conn, args: SimpleNamespace(
+            request=args.request,
+            semantic_view_ref="customers_semantic",
+            sql="select 1",
+        ),
+    )
+
+    with pytest.raises(AskExecutionError) as exc_info:
+        ask_question(
+            loaded_conn,
+            "Show revenue by region",
+            view="orders_semantic",
+            include_sql=True,
+        )
+
+    assert exc_info.value.code == "registry"
+    assert "explicitly requested" in exc_info.value.message
+
+
 def test_format_ask_result_text_renders_multiple_sections_in_order():
     text = format_ask_result_text(
         result=SimpleNamespace(
@@ -789,3 +897,60 @@ def test_format_ask_result_text_renders_multiple_sections_in_order():
     )
 
     assert text.startswith("SQL:\nselect 1\n\nCSV:\nregion,total_revenue")
+
+
+def test_format_ask_result_json_serializes_common_duckdb_value_types():
+    payload = json.loads(
+        format_ask_result_json(
+            SimpleNamespace(
+                model_dump=lambda: {
+                    "answer_text": "ok",
+                    "rows": [[date(2024, 1, 2), Decimal("12.34")]],
+                    "columns": ["day", "amount"],
+                }
+            )
+        )
+    )
+
+    assert payload["rows"] == [["2024-01-02", "12.34"]]
+
+
+def test_ask_question_writes_llm_trace_with_non_json_result_values(loaded_conn, monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            None,
+            tmp_path,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.query_request_service",
+        lambda conn, args: SimpleNamespace(
+            columns=["day", "amount"],
+            rows=[[date(2024, 1, 2), Decimal("12.34")]],
+        ),
+    )
+
+    result = ask_question(loaded_conn, "Show revenue by region", include_table=True)
+
+    assert result.rows == [[date(2024, 1, 2), Decimal("12.34")]]
+    log_files = list(tmp_path.glob("ask-*.jsonl"))
+    assert len(log_files) == 1
+    records = [json.loads(line) for line in log_files[0].read_text(encoding="utf-8").splitlines()]
+    assert records[-1]["event"] == "ask_result"
+    assert records[-1]["result"]["rows"] == [["2024-01-02", "12.34"]]

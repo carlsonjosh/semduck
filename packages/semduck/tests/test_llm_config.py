@@ -168,6 +168,35 @@ def test_resolve_llm_task_configs_uses_task_specific_models():
     assert resolved["ask_summary"].model == "summary-model"
 
 
+def test_resolve_llm_task_configs_allows_env_overrides_with_task_specific_models():
+    config = LLMConfig(
+        default_provider="ollama",
+        default_model="default-model",
+        tasks={
+            "ask_plan": TaskLLMConfig(provider="ollama", model="planner-model"),
+            "ask_summary": TaskLLMConfig(provider="local_openai", model="summary-model"),
+        },
+        providers={
+            "ollama": ProviderConfig(type="ollama", model="ignored-default"),
+            "local_openai": ProviderConfig(type="openai_compatible", model="ignored-summary"),
+        },
+    )
+
+    resolved = resolve_llm_task_configs(
+        config,
+        task_names=("ask_plan", "ask_summary"),
+        env={
+            "SEMDUCK_LLM_PROVIDER": "ollama",
+            "SEMDUCK_LLM_MODEL": "env-model",
+        },
+    )
+
+    assert resolved["ask_plan"].provider_name == "ollama"
+    assert resolved["ask_plan"].model == "env-model"
+    assert resolved["ask_summary"].provider_name == "ollama"
+    assert resolved["ask_summary"].model == "env-model"
+
+
 def test_resolve_llm_task_configs_requires_all_declared_tasks():
     config = LLMConfig(
         default_provider="ollama",

@@ -189,6 +189,9 @@ def query_request_service(conn: Any, args: QueryRequestArgs) -> QueryRequestResu
         )
     except SemanticViewError as exc:
         raise _normalize_error(exc) from exc
+    except duckdb.Error as exc:
+        detail = ServiceErrorDetail(code="runtime", message=str(exc))
+        raise SemduckServiceError(detail) from exc
 
 
 def list_semantic_views_service(conn: Any, args: ListSemanticViewsArgs | None = None) -> ListSemanticViewsResult:

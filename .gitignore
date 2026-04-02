@@ -14,3 +14,4 @@ examples/test_fixtures/dbt_project/logs/
 examples/test_fixtures/dbt_project/target/
 examples/test_fixtures/dbt_project/package-lock.yml
 examples/dbt_jaffle_shop/.user.yml
+site/
