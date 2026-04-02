@@ -199,7 +199,11 @@ def list_semantic_views_service(conn: Any, args: ListSemanticViewsArgs | None = 
     try:
         return ListSemanticViewsResult(view_names=list_semantic_views(conn))
     except duckdb.Error as exc:
-        if 'schema "semantic" does not exist' in str(exc):
+        error_message = str(exc).lower()
+        if (
+            'schema "semantic" does not exist' in error_message
+            or "table with name semantic_views does not exist" in error_message
+        ):
             return ListSemanticViewsResult(view_names=[])
         raise
 

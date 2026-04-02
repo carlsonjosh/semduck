@@ -3,7 +3,7 @@ name = "semduck"
 version = "0.1.0"
 description = "DuckDB semantic view loader and query compiler"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.11,<3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["duckdb", "semantic-layer", "analytics", "sql", "dbt"]
@@ -12,12 +12,14 @@ classifiers = [
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Database",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-  "duckdb",
+  "duckdb>=1.4",
   "fastmcp>=2,<3",
   "numpy",
   "pydantic>=2,<3",
@@ -32,7 +34,7 @@ Issues = "https://github.com/carlsonjosh/semduck/issues"
 
 [project.optional-dependencies]
 dbt = [
-  "dbt-duckdb>=1.9",
+  "dbt-duckdb>=1.9,<1.11",
 ]
 
 [project.scripts]
