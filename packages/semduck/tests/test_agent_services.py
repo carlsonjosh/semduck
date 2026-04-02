@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import duckdb
+
 from semduck.agent import (
     CheckDefinitionArgs,
     CompileRequestArgs,
@@ -62,6 +64,21 @@ def test_query_request_service_returns_rows(loaded_conn):
 
     assert result.columns == ["region", "total_revenue"]
     assert sorted(result.rows) == [["CA", 200.0], ["US", 250.0]]
+
+
+def test_query_request_service_normalizes_duckdb_runtime_errors(loaded_conn):
+    loaded_conn.execute("drop table mart.orders_base")
+
+    try:
+        query_request_service(
+            loaded_conn,
+            QueryRequestArgs(request="orders_semantic dimensions region metrics total_revenue"),
+        )
+    except SemduckServiceError as exc:
+        assert exc.detail.code == "runtime"
+        assert "orders_base" in exc.detail.message
+    else:
+        raise AssertionError("Expected SemduckServiceError")
 
 
 def test_check_definition_service_inferrs_yaml_format(conn, orders_yaml_path):

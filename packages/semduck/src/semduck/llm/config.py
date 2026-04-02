@@ -167,6 +167,7 @@ def resolve_llm_task_configs(
     env: Mapping[str, str] | None = None,
 ) -> dict[str, ResolvedLLMConfig]:
     current = config or LLMConfig()
+    values = env or os.environ
 
     if provider is not None or model is not None or base_url is not None or api_key is not None:
         resolved = resolve_llm_config(
@@ -189,8 +190,8 @@ def resolve_llm_task_configs(
         return {
             task_name: resolve_llm_config(
                 current,
-                provider=current.tasks[task_name].provider,
-                model=current.tasks[task_name].model,
+                provider=provider or values.get("SEMDUCK_LLM_PROVIDER") or current.tasks[task_name].provider,
+                model=model or values.get("SEMDUCK_LLM_MODEL") or current.tasks[task_name].model,
                 base_url=base_url,
                 api_key=api_key,
                 env=env,

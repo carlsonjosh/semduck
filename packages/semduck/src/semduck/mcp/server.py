@@ -32,9 +32,12 @@ class ServerDependencies:
     config_path: str | None = None
     provider: str | None = None
     model: str | None = None
+    conn: Any | None = None
 
     def connect(self):
-        return duckdb.connect(self.db_path)
+        if self.conn is None:
+            self.conn = duckdb.connect(self.db_path)
+        return self.conn
 
 
 def _provider_defaults_summary(deps: ServerDependencies) -> str:
@@ -71,64 +74,56 @@ def build_mcp_server(
     @mcp.tool
     def init_registry() -> dict[str, Any]:
         """Initialize the semduck registry schema in the configured DuckDB database."""
-        with deps.connect() as conn:
-            return init_registry_service(conn).model_dump()
+        return init_registry_service(deps.connect()).model_dump()
 
     @mcp.tool
     def check_definition(file: str, format: str = "auto") -> dict[str, Any]:
         """Validate a semantic definition file without writing it to the registry."""
-        with deps.connect() as conn:
-            return check_definition_service(
-                conn,
-                CheckDefinitionArgs(file=file, format=format),
-            ).model_dump()
+        return check_definition_service(
+            deps.connect(),
+            CheckDefinitionArgs(file=file, format=format),
+        ).model_dump()
 
     @mcp.tool
     def load_definition(file: str, format: str = "auto", replace_existing: bool = True) -> dict[str, Any]:
         """Load a semantic definition file into the registry."""
-        with deps.connect() as conn:
-            return load_definition_service(
-                conn,
-                LoadDefinitionArgs(file=file, format=format, replace_existing=replace_existing),
-            ).model_dump()
+        return load_definition_service(
+            deps.connect(),
+            LoadDefinitionArgs(file=file, format=format, replace_existing=replace_existing),
+        ).model_dump()
 
     @mcp.tool
     def compile_request(request: str) -> dict[str, Any]:
         """Compile a semduck semantic request to SQL."""
-        with deps.connect() as conn:
-            return compile_request_service(
-                conn,
-                CompileRequestArgs(request=request),
-            ).model_dump()
+        return compile_request_service(
+            deps.connect(),
+            CompileRequestArgs(request=request),
+        ).model_dump()
 
     @mcp.tool
     def query_request(request: str) -> dict[str, Any]:
         """Execute a semduck semantic request and return SQL plus tabular results."""
-        with deps.connect() as conn:
-            return query_request_service(
-                conn,
-                QueryRequestArgs(request=request),
-            ).model_dump()
+        return query_request_service(
+            deps.connect(),
+            QueryRequestArgs(request=request),
+        ).model_dump()
 
     @mcp.tool
     def list_semantic_views() -> dict[str, Any]:
         """List semantic views available in the registry."""
-        with deps.connect() as conn:
-            return list_semantic_views_service(conn).model_dump()
+        return list_semantic_views_service(deps.connect()).model_dump()
 
     @mcp.tool
     def describe_semantic_view(view_name: str) -> dict[str, Any]:
         """Describe one semantic view, including tables, dimensions, facts, metrics, and joins."""
-        with deps.connect() as conn:
-            return describe_semantic_view_service(
-                conn,
-                DescribeSemanticViewArgs(view_name=view_name),
-            ).model_dump()
+        return describe_semantic_view_service(
+            deps.connect(),
+            DescribeSemanticViewArgs(view_name=view_name),
+        ).model_dump()
 
     @mcp.resource("semduck://registry")
     def registry_overview() -> str:
-        with deps.connect() as conn:
-            view_names = list_semantic_views_service(conn).view_names
+        view_names = list_semantic_views_service(deps.connect()).view_names
         lines = [
             f"Database: {deps.db_path}",
             "Available semantic views:",
@@ -155,11 +150,10 @@ def build_mcp_server(
 
     @mcp.resource("semduck://views/{view_name}")
     def semantic_view_resource(view_name: str) -> dict[str, Any]:
-        with deps.connect() as conn:
-            return describe_semantic_view_service(
-                conn,
-                DescribeSemanticViewArgs(view_name=view_name),
-            ).model_dump()
+        return describe_semantic_view_service(
+            deps.connect(),
+            DescribeSemanticViewArgs(view_name=view_name),
+        ).model_dump()
 
     @mcp.prompt
     def ask_semduck_question(question: str) -> str:
