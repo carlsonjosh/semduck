@@ -361,6 +361,27 @@ def test_ask_plan_normalizes_wrapped_nullish_where_clause_strings():
     assert plan.where_clause is None
 
 
+def test_ask_plan_allows_null_chosen_view_when_request_is_empty():
+    plan = AskPlan(
+        chosen_view=None,
+        dimensions=[],
+        metrics=[],
+        where_clause=None,
+    )
+
+    assert plan.chosen_view is None
+
+
+def test_ask_plan_rejects_fields_when_chosen_view_is_null():
+    with pytest.raises(ValueError, match="dimensions and metrics must be empty"):
+        AskPlan(
+            chosen_view=None,
+            dimensions=["region"],
+            metrics=[],
+            where_clause=None,
+        )
+
+
 def test_ask_question_treats_none_string_where_clause_as_missing(loaded_conn, monkeypatch):
     monkeypatch.setattr(
         "semduck.agent.ask._resolve_ask_models",
@@ -391,6 +412,39 @@ def test_ask_question_treats_none_string_where_clause_as_missing(loaded_conn, mo
     result = ask_question(loaded_conn, "What is total revenue by region?", execute=False)
 
     assert result.semantic_request == "orders_semantic dimensions region metrics total_revenue"
+
+
+def test_ask_question_raises_registry_error_when_no_semantic_views_are_available(loaded_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan"),
+            fake_stage("ask_summary"),
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view=None,
+                dimensions=[],
+                metrics=[],
+                where_clause=None,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+
+    with pytest.raises(AskExecutionError) as excinfo:
+        ask_question(loaded_conn, "What is total revenue?")
+
+    assert excinfo.value.code == "registry"
+    assert excinfo.value.failure_stage == "ask_plan"
+    assert "No semantic views are available" in excinfo.value.message
 
 
 def test_ask_question_wraps_failures_with_troubleshooting(loaded_conn, monkeypatch):

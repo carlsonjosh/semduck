@@ -59,14 +59,19 @@ def _normalize_nullish_token(value: str) -> str:
 
 
 class AskPlan(BaseModel):
-    chosen_view: str
+    chosen_view: str | None
     dimensions: list[str] = Field(default_factory=list)
     metrics: list[str] = Field(default_factory=list)
     where_clause: str | None = None
 
     @field_validator("chosen_view")
     @classmethod
-    def validate_chosen_view(cls, value: str) -> str:
+    def validate_chosen_view(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = _normalize_nullish_token(value)
+        if value.lower() in NULLISH_WHERE_CLAUSES:
+            return None
         value = value.strip()
         if not value:
             raise ValueError("chosen_view must not be empty")
@@ -93,6 +98,12 @@ class AskPlan(BaseModel):
 
     @model_validator(mode="after")
     def validate_request_shape(self) -> "AskPlan":
+        if self.chosen_view is None:
+            if self.dimensions or self.metrics:
+                raise ValueError("dimensions and metrics must be empty when chosen_view is null")
+            if self.where_clause is not None:
+                raise ValueError("where_clause must be null when chosen_view is null")
+            return self
         if not self.dimensions and not self.metrics:
             raise ValueError("at least one dimension or metric is required")
         _validate_semantic_request(_render_semantic_request(self))
@@ -272,6 +283,8 @@ def _validate_semantic_request(value: str) -> None:
 
 
 def _render_semantic_request(plan: AskPlan) -> str:
+    if plan.chosen_view is None:
+        raise ValueError("cannot render semantic_request when chosen_view is null")
     parts = [plan.chosen_view]
     if plan.dimensions:
         parts.append(f"dimensions {', '.join(plan.dimensions)}")
@@ -336,6 +349,15 @@ def _validate_compilable_request(conn: Any, request: str) -> None:
     compile_request_service(conn, CompileRequestArgs(request=request))
 
 
+def _is_empty_plan(plan: AskPlan) -> bool:
+    return (
+        plan.chosen_view is None
+        and not plan.dimensions
+        and not plan.metrics
+        and plan.where_clause is None
+    )
+
+
 def _ask_with_semantic_retry(
     agent: Agent[AskDependencies, AskPlan],
     stage_model: AskStageModel,
@@ -358,6 +380,8 @@ def _ask_with_semantic_retry(
             attempts=attempts,
         ) from exc.cause
     attempts.append(initial_attempt)
+    if _is_empty_plan(plan):
+        return plan, attempts
     try:
         rendered_request = _render_semantic_request(plan)
         _validate_semantic_request(rendered_request)
@@ -372,13 +396,26 @@ def _ask_with_semantic_retry(
         "Your previous structured request was invalid. "
         f"chosen_view={plan.chosen_view!r}, dimensions={plan.dimensions!r}, "
         f"metrics={plan.metrics!r}, where_clause={plan.where_clause!r}\n\n"
-        "Retry. Return structured fields only: chosen_view, dimensions, metrics, and where_clause. "
-        "Set chosen_view to the semantic view name. "
-        "Put requested dimensions in dimensions, requested metrics in metrics, and any predicate in where_clause. "
-        "Do not include answer text or SQL. Do not include ORDER BY, LIMIT, or HAVING. "
-        "The rendered request shape is: "
-        "<view_name> dimensions <dimension list> metrics <metric list> where <optional predicate>. "
-        "Use semduck tools to inspect views before finalizing."
+        "Your previous response did not match the required output format."
+        ""
+        "Return only the required structured fields:"
+        "- chosen_view"
+        "- dimensions"
+        "- metrics"
+        "- where_clause"
+        ""
+        "Rules:"
+        "- Do not explain."
+        "- Do not output prose."
+        "- Do not output pseudo-tool syntax."
+        "- Do not output code fences."
+        "- Do not describe the tools."
+        "- If no predicate is needed, where_clause must be null."
+        "- If no valid view can be confirmed, return:"
+        "  chosen_view = null"
+        "  dimensions = []"
+        "  metrics = []"
+        "  where_clause = null"
     )
     try:
         retry_plan, retry_attempt = _run_agent_sync(agent, retry_prompt, deps=deps, stage_model=stage_model)
@@ -394,6 +431,8 @@ def _ask_with_semantic_retry(
         ) from exc.cause
     retry_attempt.is_retry = True
     attempts.append(retry_attempt)
+    if _is_empty_plan(retry_plan):
+        return retry_plan, attempts
     try:
         retry_request = _render_semantic_request(retry_plan)
         _validate_semantic_request(retry_request)
@@ -574,15 +613,43 @@ def create_ask_planner(model: Any) -> Agent[AskDependencies, AskPlan]:
         system_prompt=(
             "You translate analytics questions into semduck semantic requests. "
             "Use the available semduck tools to inspect semantic views before choosing a request. "
-            "Verify dimensions and metrics against describe_semantic_view before finalizing a request. "
-            "Return structured output fields: chosen_view, dimensions, metrics, and where_clause. "
-            "Do not return answer text, summaries, or SQL. "
-            "The semantic request grammar is: <view_name> dimensions <dimension list> metrics <metric list> "
-            "where <optional predicate>. Only dimensions, metrics, and optional where are supported. "
-            "Never include SQL clauses like ORDER BY, LIMIT, GROUP BY, HAVING, or raw SELECT statements. "
-            "Dimensions and metrics should be arrays of request items like ['customer_name'] or ['total_revenue']. "
-            "where_clause should contain only the predicate body, for example region = 'US'. "
-            "If no predicate is needed, return where_clause as null, not the string 'None' or 'null'."
+            "Follow this exact process: "
+            "1. Call list_semantic_views. "
+            "2. Identify the most relevant semantic view. "
+            "3. Call describe_semantic_view for that view. "
+            "4. Choose only dimensions and metrics confirmed by describe_semantic_view. "
+            "5. Return the final structured result. "
+            "Return only these structured output fields: chosen_view, dimensions, metrics, where_clause. "
+            "Rules: "
+            "Do not return answer text, summaries, SQL, markdown, code fences, pseudo-code, or commentary. "
+            "Do not describe tool calls or tool schemas in text. "
+            "Do not output strings like function <nil>, list_semantic_views, describe_semantic_view, or final_result unless making an actual tool call through the tool interface. "
+            "Do not guess or invent a view name, dimension, metric, join, or filter. "
+            "Only use dimensions and metrics confirmed by describe_semantic_view. "
+            "Do not add dimensions just because they appear in a join. The semantic view handles joins internally. "
+            "If no predicate is needed, where_clause must be null. "
+            "Do not return an empty string, 'null', 'None', or an object for where_clause. "
+            "If no semantic views are available, return: chosen_view = null, dimensions = [], metrics = [], where_clause = null. "
+            "Do not explain in prose."
+            ""
+            "Examples:"
+            "Question: 'What is total revenue by customer name?'"
+            "Return:"
+            "{"
+            "\"chosen_view\": \"orders\","
+            "\"dimensions\": [\"customer_name\"],"
+            "\"metrics\": [\"total_revenue\"],"
+            "\"where_clause\": null"
+            "}"
+            ""
+            "Question: 'What is total revenue by customer name in the US?'"
+            "Return:"
+            "{"
+            "\"chosen_view\": \"orders\","
+            "\"dimensions\": [\"customer_name\"],"
+            "\"metrics\": [\"total_revenue\"],"
+            "\"where_clause\": \"region = 'US'\""
+            "}"
         ),
     )
 
@@ -597,10 +664,7 @@ def create_ask_planner(model: Any) -> Agent[AskDependencies, AskPlan]:
             "If multiple semantic views exist, inspect them and choose the most relevant one. "
             "If no semantic views are available, do not fabricate a request."
             "Return the structured fields exactly as:"
-            "- chosen_view: null"
-            "- dimensions: []"
-            "- metrics: []"
-            "- where_clause: null"
+            "{\"chosen_view\": null, \"dimensions\": [], \"metrics\": [], \"where_clause\": null}"
             "Do not explain in prose."
         )
 
@@ -627,10 +691,14 @@ def create_ask_summary_agent(model: Any) -> Agent[None, str]:
         system_prompt=(
             "You summarize executed semduck query results for analytics questions. "
             "Use only the provided question, semantic request, SQL, columns, and rows. "
+            "Prefer one concise sentence. "
+            "If there are multiple rows, you may instead return a compact markdown table with the provided columns and rows. "
+            "Output only the final answer text. "
+            "Do not show your reasoning, analysis, thinking process, draft text, or decision process. "
             "Do not invent rows, aggregations, or facts that are not present in the payload. "
+            "If omitted_row_count is 0, do not mention truncation or omitted rows."
             "If omitted_row_count is greater than zero, mention that the answer is based on truncated results. "
             "If there are no rows, say that no matching rows were returned. "
-            "Return only the final answer text."
         ),
     )
 
@@ -699,6 +767,13 @@ def ask_question(
                 progress=progress,
             )
             attempts.extend(plan_attempts)
+            if _is_empty_plan(plan):
+                raise AskExecutionError(
+                    code="registry",
+                    message="No semantic views are available in the registry.",
+                    troubleshooting=_troubleshooting_for_error("registry"),
+                    failure_stage=plan_stage.stage,
+                )
             semantic_request = _render_semantic_request(plan)
 
             _emit_progress(progress, "compiling semantic request")
