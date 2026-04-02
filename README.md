@@ -1,18 +1,40 @@
-# semduck monorepo
+# semduck
+
+Semduck is a semantic view runtime for DuckDB. It lets you register semantic definitions, compile a compact request language into SQL, and use the same runtime from Python, the CLI, dbt, or an MCP server.
+
+Full documentation lives in the GitHub Pages docs site built from [`docs/`](docs).
+
+## Quickstart
+
+```bash
+pip install semduck
+
+semduck init --db demo.duckdb
+semduck load --db demo.duckdb --file orders_semantic.yaml
+semduck query --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
+```
+
+## Packages
+
+- [`packages/semduck`](packages/semduck): Python package with the runtime, CLI, compiler, registry, MCP server, ask workflow, and DuckDB plugin code
+- [`packages/dbt-semduck`](packages/dbt-semduck): dbt package with macros and materializations for semantic view registration and query compilation
 
 ## Repo Layout
 
-- [`packages/semduck`](packages/semduck): Python package containing the runtime, CLI, compiler, registry, and DuckDB plugin code
-- [`packages/dbt-semduck`](packages/dbt-semduck): dbt package containing macros and materializations for semantic view registration and query macros
-- [`integration_tests`](integration_tests): end-to-end test entry points
-- [`examples/dbt_jaffle_shop`](examples/dbt_jaffle_shop): example dbt project using `semduck_semantic` and `dbt_semduck.query(...)`
-- [`examples/test_fixtures`](examples/test_fixtures): source fixture projects used by automated integration tests
+- [`docs`](docs): GitHub Pages documentation site
+- [`examples/dbt_example`](examples/dbt_example): end-to-end `dbt-duckdb` example project
+- [`integration_tests`](integration_tests): end-to-end dbt integration coverage
+- [`examples/test_fixtures`](examples/test_fixtures): fixture projects used by automated tests
 
-## Workspace Notes
+## Package Boundary
 
-The root [`pyproject.toml`](pyproject.toml) defines a Python workspace for [`packages/semduck`](packages/semduck). [`packages/dbt-semduck`](packages/dbt-semduck) is intentionally a dbt package rather than a Python workspace member.
+- `semduck` owns the runtime, compiler, registry, CLI, Python API, MCP server, and DuckDB plugin surface.
+- `dbt-semduck` owns dbt-facing macros and materializations.
+- dbt support uses inline semantic DDL rather than YAML-in-dbt.
 
-The package boundary is:
+## Development
 
-- [`packages/semduck`](packages/semduck) owns the Python runtime, compiler, registry, CLI, and Python-side DuckDB integration surface
-- [`packages/dbt-semduck`](packages/dbt-semduck) owns dbt-facing macros and materializations
+```bash
+uv sync
+uv run pytest
+```

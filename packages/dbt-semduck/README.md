@@ -2,6 +2,8 @@
 
 dbt package for registering and querying semduck semantic views in `dbt-duckdb` projects.
 
+This package is the dbt-facing half of the semduck integration. The Python runtime, compiler, registry, CLI, and DuckDB plugin live in `packages/semduck`.
+
 ## Usage
 
 Add the package to `packages.yml` and configure the `semduck.dbt.plugin` plugin in your DuckDB profile.
@@ -56,3 +58,5 @@ with semduck_query as (
 
 select * from semduck_query
 ```
+
+See `examples/dbt_example` for a complete working project, including `profiles.yml`, package installation, semantic registration, and downstream query models.

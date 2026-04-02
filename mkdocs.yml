@@ -1,0 +1,50 @@
+site_name: semduck
+site_description: Portable semantic view runtime for DuckDB.
+site_url: https://carlsonjosh.github.io/semduck/
+repo_url: https://github.com/carlsonjosh/semduck
+repo_name: carlsonjosh/semduck
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - Guides:
+      - How Semduck Works: guides/how-semduck-works.md
+      - Choosing An Integration: guides/choosing-an-integration.md
+      - Semantic Definitions: guides/semantic-definitions.md
+      - Request Language: guides/request-language.md
+      - CLI: guides/cli.md
+      - Python API: guides/python-api.md
+      - dbt: guides/dbt.md
+      - MCP: guides/mcp.md
+      - Ask: guides/ask.md
+  - Reference:
+      - API Surface: reference/api.md
+      - Examples: reference/examples.md
+      - Limitations: reference/limitations.md
