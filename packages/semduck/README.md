@@ -2,6 +2,12 @@
 
 Portable semantic view runtime for DuckDB, implemented in Python.
 
+Supported baseline:
+
+- Python `3.11` to `3.12`
+- DuckDB `1.4+`
+- `dbt-duckdb` `1.10.x` for the optional dbt plugin path
+
 ## Install
 
 ```bash
@@ -222,4 +228,5 @@ The design note for that boundary is in [`project/decisions/remove_yaml_in_dbt_s
 ```bash
 uv sync
 uv run pytest
+uv run tox
 ```

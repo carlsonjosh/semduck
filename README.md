@@ -16,3 +16,27 @@ The package boundary is:
 
 - [`packages/semduck`](packages/semduck) owns the Python runtime, compiler, registry, CLI, and Python-side DuckDB integration surface
 - [`packages/dbt-semduck`](packages/dbt-semduck) owns dbt-facing macros and materializations
+
+## Compatibility Baseline
+
+- Python: `3.11` through `3.12`
+- DuckDB: `1.4+`
+- dbt integration: `dbt-duckdb` `1.10.x` or newer within the supported range
+
+## Tox
+
+Use `tox` to run the local compatibility matrix:
+
+```bash
+uv sync
+uv run tox
+```
+
+Useful targeted runs:
+
+```bash
+uv run tox -e py311-core-duckdb14
+uv run tox -e py311-dbt
+uv run tox -e py312-core-latest
+uv run tox -e py312-dbt
+```

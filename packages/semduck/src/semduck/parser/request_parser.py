@@ -25,7 +25,10 @@ def _check_unsupported(request: str) -> None:
     lowered = request.lower()
     for pattern in UNSUPPORTED_PATTERNS:
         if re.search(pattern, lowered):
-            raise SemanticUnsupportedError(f"Unsupported clause in semantic request: {pattern.replace('\\b', '')}")
+            unsupported_clause = pattern.replace("\\b", "")
+            raise SemanticUnsupportedError(
+                f"Unsupported clause in semantic request: {unsupported_clause}"
+            )
 
 
 def find_keyword_positions(request: str) -> dict[str, int]:
