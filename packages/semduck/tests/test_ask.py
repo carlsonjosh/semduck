@@ -5,6 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from semduck.agent.models import ServiceErrorDetail
+from semduck.agent.services import SemduckServiceError
 from semduck.agent import AskExecutionError, AskPlan, ask_question, format_ask_result_text
 from semduck.agent.ask import AskStageModel
 
@@ -27,6 +29,14 @@ class SequencedFakeAgent:
         if self._index < len(self._outputs) - 1:
             self._index += 1
         return SimpleNamespace(output=output)
+
+
+class RaisingFakeAgent:
+    def __init__(self, error: Exception):
+        self._error = error
+
+    async def run(self, question, *, deps):
+        raise self._error
 
 
 def fake_stage(stage: str, provider: str = "ollama", model: str = "llama3.1") -> AskStageModel:
@@ -230,10 +240,103 @@ def test_ask_question_writes_llm_trace_when_enabled(loaded_conn, monkeypatch, tm
     records = [json.loads(line) for line in log_files[0].read_text(encoding="utf-8").splitlines()]
     assert records[0]["event"] == "ask_plan_attempt"
     assert records[0]["provider"] == "ollama"
+    assert "started_at" in records[0]
+    assert "finished_at" in records[0]
+    assert isinstance(records[0]["duration_ms"], int)
     assert records[1]["event"] == "ask_summary_attempt"
     assert records[1]["provider"] == "openai_compatible"
     assert records[-1]["event"] == "ask_result"
     assert records[-1]["result"]["summary_model"] == "summary-model"
+
+
+def test_ask_question_writes_partial_trace_for_planner_failure(loaded_conn, monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            fake_stage("ask_summary", "ollama", "summary-model"),
+            tmp_path,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: RaisingFakeAgent(ValueError("Exceeded maximum retries (1) for output validation")),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+
+    with pytest.raises(AskExecutionError) as excinfo:
+        ask_question(loaded_conn, "What is total revenue by customer name?")
+
+    assert excinfo.value.failure_stage == "ask_plan"
+
+    log_files = list(tmp_path.glob("ask-*.jsonl"))
+    assert len(log_files) == 1
+    records = [json.loads(line) for line in log_files[0].read_text(encoding="utf-8").splitlines()]
+    assert records[0]["event"] == "ask_plan_attempt"
+    assert records[0]["output"]["error"]["message"] == "Exceeded maximum retries (1) for output validation"
+    assert records[-1]["event"] == "ask_error"
+    assert records[-1]["failure_stage"] == "ask_plan"
+
+
+def test_ask_question_writes_plan_attempts_for_compile_failure(loaded_conn, monkeypatch, tmp_path):
+    call_count = 0
+    original_compile = __import__(
+        "semduck.agent.ask",
+        fromlist=["compile_request_service"],
+    ).compile_request_service
+
+    def flaky_compile(conn, args):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return original_compile(conn, args)
+        raise SemduckServiceError(
+            ServiceErrorDetail(
+                code="registry",
+                message="Unknown semantic view: orders ['customer_name'] ['total_revenue']",
+            )
+        )
+
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            fake_stage("ask_summary", "ollama", "summary-model"),
+            tmp_path,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+    monkeypatch.setattr("semduck.agent.ask.compile_request_service", flaky_compile)
+
+    with pytest.raises(AskExecutionError) as excinfo:
+        ask_question(loaded_conn, "What is total revenue by customer name?")
+
+    assert excinfo.value.failure_stage == "compile"
+
+    log_files = list(tmp_path.glob("ask-*.jsonl"))
+    assert len(log_files) == 1
+    records = [json.loads(line) for line in log_files[0].read_text(encoding="utf-8").splitlines()]
+    assert records[0]["event"] == "ask_plan_attempt"
+    assert records[0]["output"]["chosen_view"] == "orders_semantic"
+    assert records[-1]["event"] == "ask_error"
+    assert records[-1]["failure_stage"] == "compile"
+    assert records[-1]["error"]["code"] == "registry"
 
 
 def test_ask_plan_normalizes_nullish_where_clause_strings():
@@ -242,6 +345,17 @@ def test_ask_plan_normalizes_nullish_where_clause_strings():
         dimensions=["customer_name"],
         metrics=["total_revenue"],
         where_clause="None",
+    )
+
+    assert plan.where_clause is None
+
+
+def test_ask_plan_normalizes_wrapped_nullish_where_clause_strings():
+    plan = AskPlan(
+        chosen_view="orders",
+        dimensions=["customer_name"],
+        metrics=["total_revenue"],
+        where_clause='["null"]',
     )
 
     assert plan.where_clause is None

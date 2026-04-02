@@ -5,13 +5,13 @@ llm:
   tasks:
     ask_plan:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen3.5:2b
     ask_summary:
       provider: ollama
-      model: gemma3n
+      model: qwen3.5:2b
   providers:
     ollama:
       type: ollama
-      model: qwen3.5:9b
+      model: qwen3.5:2b
       # model: lfm2.5-thinking
       base_url: http://localhost:11434/v1

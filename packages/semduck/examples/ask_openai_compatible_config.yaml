@@ -1,18 +1,22 @@
 llm:
-  default_provider: local_openai
+  default_provider: openai
+  log_dir: .semduck/llm-logs
   # log_dir: .semduck/llm-logs
+  # Export your OpenAI API key before running:
+  # export OPENAI_API_KEY=your_api_key_here
   # To use different models for planning and result summarization, define both tasks:
-  # Note that ask_plan requires a model that supports tools, ask_summary can use a 
+  # Note that ask_plan requires a model that supports tools, ask_summary can use a
   # smaller model that doesn't support tools.
   # tasks:
   #   ask_plan:
-  #     provider: local_openai
-  #     model: qwen2.5-coder
+  #     provider: openai
+  #     model: gpt-4.1-mini
   #   ask_summary:
-  #     provider: local_openai
-  #     model: qwen2.5-coder
+  #     provider: openai
+  #     model: gpt-4.1-mini
   providers:
-    local_openai:
+    openai:
       type: openai_compatible
-      model: qwen2.5-coder
-      base_url: http://localhost:8000/v1
+      model: gpt-5.4
+      base_url: https://api.openai.com/v1
+      api_key_env: OPENAI_API_KEY
