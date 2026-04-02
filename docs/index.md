@@ -1,17 +1,30 @@
 # semduck
 
-`semduck` is a semantic view runtime for DuckDB. It gives you a small semantic layer that can be loaded from YAML or semantic DDL, compiled from a compact request language into SQL, and used from Python, the CLI, dbt, or an MCP server.
+Semduck is a semantic layer for DuckDB built for local analytics.
 
-## Start Here
+It helps you define semantic views once, then reuse those definitions across people, scripts, apps, and agents. Instead of rebuilding the same joins and metrics in raw SQL every time, you ask for dimensions, metrics, and filters and let Semduck compile the query.
 
-Choose the path that matches how you want to use it:
+## The Problem
 
-- Python or CLI: install `semduck`, initialize a registry, load a definition, compile or execute requests.
-- dbt: use `dbt-semduck` plus the DuckDB plugin to register semantic views from inline DDL and query them from downstream models.
-- MCP: run the FastMCP server over `stdio` so an MCP client can inspect views, compile requests, and execute queries.
-- `ask`: configure an LLM provider and let semduck turn natural-language analytics questions into semantic requests.
+DuckDB makes local analysis fast. The hard part is keeping the meaning of the data consistent once more than one query, notebook, script, or tool is involved.
 
-## Quick Example
+Typical failure modes:
+
+- the same metric gets redefined in multiple places
+- joins are copied by hand and drift over time
+- analysts know the business question but still need to reconstruct the SQL
+- machine clients can access the database, but not the semantic intent behind it
+
+Semduck addresses that gap with semantic views stored in DuckDB and a small request language that works for both humans and machines.
+
+## The Core Flow
+
+1. Author a semantic view in YAML or semantic DDL.
+2. Load it into the Semduck registry in DuckDB.
+3. Ask for metrics, dimensions, and filters.
+4. Compile to SQL or execute directly.
+
+Example:
 
 ```bash
 pip install semduck
@@ -21,17 +34,16 @@ semduck load --db demo.duckdb --file orders_semantic.yaml
 semduck query --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
 ```
 
-The request language stays semantic. You ask for dimensions, metrics, and optional filters; semduck resolves joins and generates SQL against the registered semantic view.
+The request stays semantic. Semduck resolves the view definition, joins, and metric expressions for you.
 
-## Core Concepts
+## Where It Fits
 
-- Registry: semduck stores semantic view definitions in a DuckDB schema.
-- Definition: a semantic view can be authored in YAML or semantic DDL.
-- Request: users query a view with a compact semantic request language, not raw SQL.
-- Compiler: semduck resolves the request into executable SQL.
-- Runtime: the compiled SQL can be returned, executed, or exposed through dbt and MCP integrations.
+- Python or CLI: local scripts, notebooks, and direct analysis workflows
+- dbt: semantic views authored with inline DDL and queried from downstream models
+- MCP: tool-friendly access for machine clients that need to inspect and query semantic views
+- `ask`: natural-language analytics over the same semantic runtime
 
-## Recommended Reading
+## Start Here
 
 - [Installation](getting-started/installation.md)
 - [Quickstart](getting-started/quickstart.md)
