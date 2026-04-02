@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from io import StringIO
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 from uuid import uuid4
 
 import duckdb
@@ -40,6 +42,9 @@ SQL_PREFIXES = ("select", "with", "insert", "update", "delete")
 MODEL_MESSAGE_ADAPTER = TypeAdapter(ModelMessage)
 NULLISH_WHERE_CLAUSES = {"none", "null", "nil", "n/a", "na"}
 AskProgressReporter = Callable[[str], None]
+AskOutput = Literal["sql", "table", "csv", "summary"]
+DEFAULT_ASK_OUTPUTS: tuple[AskOutput, ...] = ("table",)
+ALL_ASK_OUTPUTS: tuple[AskOutput, ...] = ("sql", "table", "csv", "summary")
 
 
 def _normalize_nullish_token(value: str) -> str:
@@ -125,6 +130,7 @@ class AskResult(BaseModel):
     row_limit: int | None = None
     total_row_count: int = 0
     omitted_row_count: int = 0
+    requested_outputs: list[AskOutput] = Field(default_factory=list)
 
 
 class AskExecutionError(Exception):
@@ -198,17 +204,19 @@ def _resolve_ask_models(
     model: str | None = None,
     llm_log_dir: str | None = None,
     disable_llm_log: bool = False,
-) -> tuple[AskStageModel, AskStageModel, Path | None]:
+    include_summary: bool = False,
+) -> tuple[AskStageModel, AskStageModel | None, Path | None]:
     llm_config = load_llm_config(config)
+    task_names: tuple[str, ...] = (ASK_PLAN_TASK, ASK_SUMMARY_TASK) if include_summary else (ASK_PLAN_TASK,)
     resolved_tasks = resolve_llm_task_configs(
         llm_config,
-        task_names=(ASK_PLAN_TASK, ASK_SUMMARY_TASK),
+        task_names=task_names,
         provider=provider,
         model=model,
     )
     registry = create_provider_registry()
     plan_config = resolved_tasks[ASK_PLAN_TASK]
-    summary_config = resolved_tasks[ASK_SUMMARY_TASK]
+    summary_config = resolved_tasks.get(ASK_SUMMARY_TASK)
     log_dir = resolve_llm_log_dir(
         llm_config,
         log_dir=llm_log_dir,
@@ -221,11 +229,15 @@ def _resolve_ask_models(
             model_name=plan_config.model,
             agent_model=registry.build_model(plan_config),
         ),
-        AskStageModel(
-            stage=ASK_SUMMARY_TASK,
-            provider_name=summary_config.provider_name,
-            model_name=summary_config.model,
-            agent_model=registry.build_model(summary_config),
+        (
+            AskStageModel(
+                stage=ASK_SUMMARY_TASK,
+                provider_name=summary_config.provider_name,
+                model_name=summary_config.model,
+                agent_model=registry.build_model(summary_config),
+            )
+            if summary_config is not None
+            else None
         ),
         log_dir,
     )
@@ -263,7 +275,7 @@ def _troubleshooting_for_error(code: str) -> list[str]:
         code,
         [
             "Check the configured provider, model, and semantic view inputs.",
-            "Use --sql-only to inspect the generated semantic request and compiled SQL separately.",
+            "Use --sql to inspect the generated semantic request and compiled SQL without executing the query.",
         ],
     )
 
@@ -356,6 +368,27 @@ def _is_empty_plan(plan: AskPlan) -> bool:
         and not plan.metrics
         and plan.where_clause is None
     )
+
+
+def _normalize_requested_outputs(
+    *,
+    include_sql: bool = False,
+    include_table: bool = False,
+    include_csv: bool = False,
+    include_summary: bool = False,
+) -> list[AskOutput]:
+    requested_outputs: list[AskOutput] = []
+    if include_sql:
+        requested_outputs.append("sql")
+    if include_table:
+        requested_outputs.append("table")
+    if include_csv:
+        requested_outputs.append("csv")
+    if include_summary:
+        requested_outputs.append("summary")
+    if not requested_outputs:
+        return list(DEFAULT_ASK_OUTPUTS)
+    return requested_outputs
 
 
 def _ask_with_semantic_retry(
@@ -722,14 +755,24 @@ def ask_question(
     provider: str | None = None,
     model: str | None = None,
     view: str | None = None,
-    execute: bool = True,
     row_limit: int | None = None,
     llm_log_dir: str | None = None,
     disable_llm_log: bool = False,
+    include_sql: bool = False,
+    include_table: bool = False,
+    include_csv: bool = False,
+    include_summary: bool = False,
     progress: AskProgressReporter | None = None,
 ) -> AskResult:
     attempts: list[AskAttemptTrace] = []
     resolved_log_dir: Path | None = None
+    requested_outputs = _normalize_requested_outputs(
+        include_sql=include_sql,
+        include_table=include_table,
+        include_csv=include_csv,
+        include_summary=include_summary,
+    )
+    execute = any(output in {"table", "csv", "summary"} for output in requested_outputs)
     try:
         _emit_progress(progress, "resolving ask configuration")
         plan_stage, summary_stage, resolved_log_dir = _resolve_ask_models(
@@ -738,9 +781,10 @@ def ask_question(
             model=model,
             llm_log_dir=llm_log_dir,
             disable_llm_log=disable_llm_log,
+            include_summary="summary" in requested_outputs,
         )
         planner = create_ask_planner(plan_stage.agent_model)
-        summary_agent = create_ask_summary_agent(summary_stage.agent_model)
+        summary_agent = create_ask_summary_agent(summary_stage.agent_model) if summary_stage is not None else None
         conn, should_close = _connect_if_needed(conn_or_db)
     except (ValueError, FileNotFoundError) as exc:
         _emit_progress(progress, "failed")
@@ -812,24 +856,32 @@ def ask_question(
                     omitted_row_count = max(total_row_count - len(rows), 0)
                 else:
                     rows = query_result.rows
-                _emit_progress(progress, "summarizing results")
-                summary, summary_attempts = _summarize_results(
-                    summary_agent,
-                    summary_stage,
-                    question=question,
-                    semantic_request=semantic_request,
-                    sql=compiled.sql,
-                    columns=columns,
-                    rows=rows,
-                    total_row_count=total_row_count,
-                    omitted_row_count=omitted_row_count,
-                )
-                attempts.extend(summary_attempts)
-                answer_text = summary
-                summary_provider = summary_stage.provider_name
-                summary_model = summary_stage.model_name
+                if "summary" in requested_outputs:
+                    _emit_progress(progress, "summarizing results")
+                    if summary_agent is None or summary_stage is None:
+                        raise AskExecutionError(
+                            code="configuration",
+                            message="Summary output requested but no summary model was resolved.",
+                            troubleshooting=_troubleshooting_for_error("configuration"),
+                            failure_stage=ASK_SUMMARY_TASK,
+                        )
+                    summary, summary_attempts = _summarize_results(
+                        summary_agent,
+                        summary_stage,
+                        question=question,
+                        semantic_request=semantic_request,
+                        sql=compiled.sql,
+                        columns=columns,
+                        rows=rows,
+                        total_row_count=total_row_count,
+                        omitted_row_count=omitted_row_count,
+                    )
+                    attempts.extend(summary_attempts)
+                    answer_text = summary
+                    summary_provider = summary_stage.provider_name
+                    summary_model = summary_stage.model_name
             else:
-                _emit_progress(progress, "skipping execution (--sql-only)")
+                _emit_progress(progress, "skipping execution")
 
             result = AskResult(
                 answer_text=answer_text,
@@ -846,6 +898,7 @@ def ask_question(
                 row_limit=row_limit,
                 total_row_count=total_row_count,
                 omitted_row_count=omitted_row_count,
+                requested_outputs=requested_outputs,
             )
             _write_llm_trace(
                 log_dir=resolved_log_dir,
@@ -902,44 +955,56 @@ def ask_question(
 
 
 def format_ask_result_text(result: AskResult) -> str:
-    lines = [
-        f"Answer: {result.answer_text}",
-        f"View: {result.chosen_view}",
-        f"Provider: {result.provider}",
-        f"Model: {result.model}",
-    ]
-    summary_provider = getattr(result, "summary_provider", None)
-    summary_model = getattr(result, "summary_model", None)
-    if summary_provider and summary_model:
-        lines.append(f"Summary Provider: {summary_provider}")
-        lines.append(f"Summary Model: {summary_model}")
-    lines.extend(
-        [
-            f"Request: {result.semantic_request}",
-            "SQL:",
-            result.sql,
-        ]
-    )
-    if result.executed:
-        lines.append("Results:")
-        if result.columns:
-            lines.append(" | ".join(result.columns))
-            display_rows = result.rows[:TEXT_RESULT_ROW_LIMIT]
-            for row in display_rows:
-                lines.append(" | ".join("" if value is None else str(value) for value in row))
-            explicit_omitted = getattr(result, "omitted_row_count", None)
-            if explicit_omitted is None:
-                omitted_count = len(result.rows) - len(display_rows)
-            else:
-                omitted_count = explicit_omitted
-            if omitted_count > 0:
-                lines.append(f"... {omitted_count} more rows omitted")
-        else:
-            lines.append("(no rows)")
-    else:
-        lines.append("Execution: skipped (--sql-only)")
-    return "\n".join(lines)
+    requested_outputs = getattr(result, "requested_outputs", None) or list(DEFAULT_ASK_OUTPUTS)
+    sections: list[tuple[str, str]] = []
+    if "sql" in requested_outputs:
+        sections.append(("SQL", str(result.sql)))
+    if "table" in requested_outputs:
+        sections.append(("Table", _format_result_table(result)))
+    if "csv" in requested_outputs:
+        sections.append(("CSV", _format_result_csv(result)))
+    if "summary" in requested_outputs:
+        sections.append(("Summary", _format_result_summary(result)))
+
+    if not sections:
+        return _format_result_table(result)
+    if len(sections) == 1:
+        return sections[0][1]
+    rendered_sections = [f"{title}:\n{content}" for title, content in sections]
+    return "\n\n".join(rendered_sections)
 
 
 def format_ask_result_json(result: AskResult) -> str:
     return json.dumps(result.model_dump(), indent=2)
+
+
+def _format_result_table(result: AskResult) -> str:
+    if not result.executed:
+        return "(execution skipped)"
+    lines: list[str] = []
+    if result.columns:
+        lines.append(" | ".join(result.columns))
+        display_rows = result.rows[:TEXT_RESULT_ROW_LIMIT]
+        for row in display_rows:
+            lines.append(" | ".join("" if value is None else str(value) for value in row))
+        omitted_count = getattr(result, "omitted_row_count", max(len(result.rows) - len(display_rows), 0))
+        if omitted_count > 0:
+            lines.append(f"... {omitted_count} more rows omitted")
+        return "\n".join(lines)
+    return "(no rows)"
+
+
+def _format_result_csv(result: AskResult) -> str:
+    if not result.executed:
+        return ""
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    if result.columns:
+        writer.writerow(result.columns)
+        for row in result.rows:
+            writer.writerow(row)
+    return buffer.getvalue().rstrip("\r\n")
+
+
+def _format_result_summary(result: AskResult) -> str:
+    return str(result.answer_text)

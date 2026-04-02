@@ -49,7 +49,10 @@ def build_parser() -> argparse.ArgumentParser:
     ask_cmd.add_argument("--provider")
     ask_cmd.add_argument("--model")
     ask_cmd.add_argument("--view")
-    ask_cmd.add_argument("--sql-only", action="store_true")
+    ask_cmd.add_argument("--sql", action="store_true")
+    ask_cmd.add_argument("--table", action="store_true")
+    ask_cmd.add_argument("--csv", action="store_true")
+    ask_cmd.add_argument("--summary", action="store_true")
     ask_cmd.add_argument("--row-limit", type=int)
     ask_cmd.add_argument("--llm-log-dir")
     ask_cmd.add_argument("--no-llm-log", action="store_true")
@@ -148,10 +151,13 @@ def main(argv: list[str] | None = None) -> int:
                     provider=args.provider,
                     model=args.model,
                     view=args.view,
-                    execute=not args.sql_only,
                     row_limit=args.row_limit,
                     llm_log_dir=args.llm_log_dir,
                     disable_llm_log=args.no_llm_log,
+                    include_sql=args.sql,
+                    include_table=args.table,
+                    include_csv=args.csv,
+                    include_summary=args.summary,
                     progress=_print_ask_status,
                 )
                 if args.output_format == "json":

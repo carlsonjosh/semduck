@@ -18,4 +18,5 @@ echo "semduck ask:"
 uv run python -m semduck.cli ask \
   --db "$DB_PATH" \
   --config "$CONFIG_PATH" \
-  --question "$QUESTION"
+  --question "$QUESTION" \
+  --table --summary

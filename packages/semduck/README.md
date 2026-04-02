@@ -57,7 +57,7 @@ semduck ask \
   --config packages/semduck/examples/ask_ollama_config.yaml \
   --llm-log-dir .semduck/llm-logs \
   --question "What is total revenue by customer name?" \
-  --sql-only
+  --sql
 ```
 
 Configure an OpenAI-compatible local server and run the ask CLI:
@@ -68,12 +68,12 @@ semduck ask \
   --config packages/semduck/examples/ask_openai_compatible_config.yaml \
   --llm-log-dir .semduck/llm-logs \
   --question "What is total revenue by customer name?" \
-  --sql-only
+  --sql
 ```
 
 Set `llm.log_dir` in the config file to enable persistent trace logging by default, or use `--llm-log-dir` to override it per run. Pass `--no-llm-log` to disable logging even when the config file specifies a directory.
 
-`semduck ask` now uses a planner stage to build the semantic request and, when execution is enabled, a separate summary stage to explain the executed rows. Advanced users can configure different models for those jobs with `llm.tasks.ask_plan` and `llm.tasks.ask_summary`. If task-specific config is used, both tasks must be provided.
+`semduck ask` now uses a planner stage to build the semantic request and, when `--summary` is requested, a separate summary stage to explain the executed rows. Advanced users can configure different models for those jobs with `llm.tasks.ask_plan` and `llm.tasks.ask_summary`. If task-specific config is used, the summary task only needs to be configured when summary output is requested.
 
 During `semduck ask`, the CLI now prints one-line stage updates such as planning, compile, execution, and summarization to `stderr`. Final results remain on `stdout`, so JSON output stays machine-readable.
 

@@ -40,6 +40,7 @@ def test_cli_ask_prints_text_output(monkeypatch, capsys):
             semantic_request="orders_semantic dimensions region metrics total_revenue where region = 'US'",
             sql="select 1",
             executed=True,
+            requested_outputs=["table"],
             columns=["region", "total_revenue"],
             rows=[["US", 250.0]],
         )
@@ -53,7 +54,8 @@ def test_cli_ask_prints_text_output(monkeypatch, capsys):
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "Answer: US revenue is 250.0" in captured.out
+    assert "region | total_revenue" in captured.out
+    assert "US | 250.0" in captured.out
     assert "status: resolving ask configuration" in captured.err
     assert "status: finished" in captured.err
 
@@ -71,6 +73,7 @@ def test_cli_ask_prints_json_output(monkeypatch, capsys):
                 "semantic_request": "orders_semantic dimensions region metrics total_revenue where region = 'US'",
                 "sql": "select 1",
                 "executed": False,
+                "requested_outputs": ["sql"],
                 "columns": [],
                 "rows": [],
             }
@@ -105,6 +108,7 @@ def test_cli_ask_passes_llm_logging_options(monkeypatch, capsys):
             semantic_request="orders_semantic dimensions region metrics total_revenue where region = 'US'",
             sql="select 1",
             executed=False,
+            requested_outputs=["sql"],
             columns=[],
             rows=[],
         )
@@ -130,11 +134,60 @@ def test_cli_ask_passes_llm_logging_options(monkeypatch, capsys):
     assert code == 0
     assert captured_kwargs["llm_log_dir"] == "trace-logs"
     assert captured_kwargs["disable_llm_log"] is True
+    assert captured_kwargs["include_sql"] is False
+    assert captured_kwargs["include_table"] is False
+    assert captured_kwargs["include_csv"] is False
+    assert captured_kwargs["include_summary"] is False
     assert captured_kwargs["progress"] is not None
 
     captured = capsys.readouterr()
     assert "status: resolving ask configuration" in captured.err
     assert "status: finished" in captured.err
+
+
+def test_cli_ask_passes_additive_output_flags(monkeypatch, capsys):
+    captured_kwargs = {}
+
+    def fake_ask_question(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        kwargs["progress"]("resolving ask configuration")
+        kwargs["progress"]("finished")
+        return SimpleNamespace(
+            answer_text="US revenue is 250.0",
+            chosen_view="orders_semantic",
+            provider="ollama",
+            model="llama3.1",
+            semantic_request="orders_semantic dimensions region metrics total_revenue where region = 'US'",
+            sql="select 1",
+            executed=True,
+            requested_outputs=["sql", "csv"],
+            columns=["region", "total_revenue"],
+            rows=[["US", 250.0]],
+        )
+
+    monkeypatch.setattr("semduck.cli.ask_question", fake_ask_question)
+
+    code = main(
+        [
+            "ask",
+            "--db",
+            ":memory:",
+            "--question",
+            "What is US revenue?",
+            "--sql",
+            "--csv",
+        ]
+    )
+
+    assert code == 0
+    assert captured_kwargs["include_sql"] is True
+    assert captured_kwargs["include_csv"] is True
+    assert captured_kwargs["include_table"] is False
+    assert captured_kwargs["include_summary"] is False
+
+    captured = capsys.readouterr()
+    assert "SQL:" in captured.out
+    assert "CSV:" in captured.out
 
 
 def test_cli_status_reporter_prints_expected_format(capsys):

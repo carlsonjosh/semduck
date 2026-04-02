@@ -84,7 +84,7 @@ def test_ask_question_executes_compiled_request(loaded_conn, monkeypatch):
         ),
     )
 
-    result = ask_question(loaded_conn, "What is US revenue?")
+    result = ask_question(loaded_conn, "What is US revenue?", include_summary=True)
 
     assert result.executed is True
     assert result.provider == "ollama"
@@ -94,6 +94,7 @@ def test_ask_question_executes_compiled_request(loaded_conn, monkeypatch):
     assert result.columns == ["region", "total_revenue"]
     assert result.rows == [["US", 250.0]]
     assert result.answer_text == "US revenue is 250.0"
+    assert result.requested_outputs == ["summary"]
 
 
 def test_ask_question_executes_request_only_once(loaded_conn, monkeypatch):
@@ -162,7 +163,7 @@ def test_ask_question_sql_only_skips_execution(loaded_conn, monkeypatch):
         ),
     )
 
-    result = ask_question(loaded_conn, "Show revenue by region", execute=False)
+    result = ask_question(loaded_conn, "Show revenue by region", include_sql=True)
 
     assert result.executed is False
     assert result.columns == []
@@ -171,6 +172,7 @@ def test_ask_question_sql_only_skips_execution(loaded_conn, monkeypatch):
     assert result.summary_model is None
     assert result.answer_text.startswith("Prepared semantic request without executing it:")
     assert "select" in result.sql.lower()
+    assert result.requested_outputs == ["sql"]
 
 
 def test_ask_question_applies_row_limit(loaded_conn, monkeypatch):
@@ -233,7 +235,7 @@ def test_ask_question_writes_llm_trace_when_enabled(loaded_conn, monkeypatch, tm
         ),
     )
 
-    ask_question(loaded_conn, "What is US revenue?")
+    ask_question(loaded_conn, "What is US revenue?", include_summary=True)
 
     log_files = list(tmp_path.glob("ask-*.jsonl"))
     assert len(log_files) == 1
@@ -409,7 +411,7 @@ def test_ask_question_treats_none_string_where_clause_as_missing(loaded_conn, mo
         ),
     )
 
-    result = ask_question(loaded_conn, "What is total revenue by region?", execute=False)
+    result = ask_question(loaded_conn, "What is total revenue by region?", include_sql=True)
 
     assert result.semantic_request == "orders_semantic dimensions region metrics total_revenue"
 
@@ -507,7 +509,7 @@ def test_ask_question_retries_when_model_returns_sql(loaded_conn, monkeypatch):
         ),
     )
 
-    result = ask_question(loaded_conn, "Show revenue by region", execute=False)
+    result = ask_question(loaded_conn, "Show revenue by region", include_sql=True)
 
     assert result.semantic_request == "orders_semantic dimensions region metrics total_revenue"
     assert "select" in result.sql.lower()
@@ -543,7 +545,7 @@ def test_ask_question_raises_parse_error_after_sql_retry(loaded_conn, monkeypatc
     )
 
     with pytest.raises(AskExecutionError) as excinfo:
-        ask_question(loaded_conn, "Show revenue by region", execute=False)
+        ask_question(loaded_conn, "Show revenue by region", include_sql=True)
 
     assert excinfo.value.code == "parse"
     assert excinfo.value.troubleshooting
@@ -580,7 +582,7 @@ def test_ask_question_retries_when_model_returns_unsupported_clause(loaded_conn,
         ),
     )
 
-    result = ask_question(loaded_conn, "Show revenue by region", execute=False)
+    result = ask_question(loaded_conn, "Show revenue by region", include_sql=True)
 
     assert result.semantic_request == "orders_semantic dimensions region metrics total_revenue"
 
@@ -615,7 +617,7 @@ def test_ask_question_raises_unsupported_error_after_clause_retry(loaded_conn, m
     )
 
     with pytest.raises(AskExecutionError) as excinfo:
-        ask_question(loaded_conn, "Show revenue by region", execute=False)
+        ask_question(loaded_conn, "Show revenue by region", include_sql=True)
 
     assert excinfo.value.code == "unsupported"
     assert excinfo.value.troubleshooting
@@ -652,12 +654,12 @@ def test_ask_question_retries_when_model_omits_request_keywords(loaded_conn, mon
         ),
     )
 
-    result = ask_question(loaded_conn, "What is total revenue by customer segment?", execute=False)
+    result = ask_question(loaded_conn, "What is total revenue by customer segment?", include_sql=True)
 
     assert result.semantic_request == "orders_semantic dimensions customer_segment metrics total_revenue"
 
 
-def test_format_ask_result_text_includes_provenance():
+def test_format_ask_result_text_summary_only_returns_answer_text():
     text = format_ask_result_text(
         result=SimpleNamespace(
             answer_text="US revenue is 250.0",
@@ -669,16 +671,13 @@ def test_format_ask_result_text_includes_provenance():
             semantic_request="orders_semantic dimensions region metrics total_revenue where region = 'US'",
             sql="select 1",
             executed=True,
+            requested_outputs=["summary"],
             columns=["region", "total_revenue"],
             rows=[["US", 250.0]],
         )
     )
 
-    assert "Answer: US revenue is 250.0" in text
-    assert "Provider: ollama" in text
-    assert "Summary Provider: openai_compatible" in text
-    assert "Request: orders_semantic dimensions region metrics total_revenue where region = 'US'" in text
-    assert "region | total_revenue" in text
+    assert text == "US revenue is 250.0"
 
 
 def test_format_ask_result_text_truncates_large_result_sets():
@@ -694,6 +693,7 @@ def test_format_ask_result_text_truncates_large_result_sets():
             semantic_request="orders_semantic dimensions customer_name metrics total_revenue",
             sql="select 1",
             executed=True,
+            requested_outputs=["table"],
             row_limit=20,
             total_row_count=25,
             omitted_row_count=5,
@@ -706,3 +706,86 @@ def test_format_ask_result_text_truncates_large_result_sets():
     assert "customer_19 | 19.0" in text
     assert "customer_20 | 20.0" not in text
     assert "... 5 more rows omitted" in text
+
+
+def test_ask_question_default_output_is_table_without_summary(loaded_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            None,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+
+    result = ask_question(loaded_conn, "Show revenue by region")
+
+    assert result.executed is True
+    assert result.requested_outputs == ["table"]
+    assert result.summary_provider is None
+    assert result.summary_model is None
+
+
+def test_ask_question_combines_sql_and_csv_without_summary(loaded_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            None,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+
+    result = ask_question(loaded_conn, "Show revenue by region", include_sql=True, include_csv=True)
+
+    assert result.executed is True
+    assert result.requested_outputs == ["sql", "csv"]
+    assert result.summary_provider is None
+    assert result.summary_model is None
+
+
+def test_format_ask_result_text_renders_multiple_sections_in_order():
+    text = format_ask_result_text(
+        result=SimpleNamespace(
+            answer_text="unused",
+            chosen_view="orders_semantic",
+            provider="ollama",
+            model="planner-model",
+            semantic_request="orders_semantic dimensions region metrics total_revenue",
+            sql="select 1",
+            executed=True,
+            requested_outputs=["sql", "csv"],
+            columns=["region", "total_revenue"],
+            rows=[["US", 250.0]],
+        )
+    )
+
+    assert text.startswith("SQL:\nselect 1\n\nCSV:\nregion,total_revenue")
