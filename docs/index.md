@@ -53,3 +53,4 @@ The request stays semantic. Semduck resolves the view definition, joins, and met
 - [Python API Guide](guides/python-api.md)
 - [dbt Guide](guides/dbt.md)
 - [MCP Guide](guides/mcp.md)
+- [MCP Best Practices](guides/mcp-best-practices.md)

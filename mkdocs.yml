@@ -43,6 +43,7 @@ nav:
       - Python API: guides/python-api.md
       - dbt: guides/dbt.md
       - MCP: guides/mcp.md
+      - MCP Best Practices: guides/mcp-best-practices.md
       - Ask: guides/ask.md
   - Reference:
       - API Surface: reference/api.md
