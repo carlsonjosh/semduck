@@ -1,0 +1,97 @@
+name: orders_semantic
+description: Order-level ecommerce analytics across customers and segments
+
+tables:
+  - name: orders
+    base_table:
+      table: orders
+    primary_key:
+      columns: [order_id]
+    dimensions:
+      - name: order_id
+        expr: order_id
+        data_type: varchar
+      - name: order_status
+        expr: order_status
+        data_type: varchar
+      - name: sales_channel
+        expr: sales_channel
+        data_type: varchar
+      - name: payment_method
+        expr: payment_method
+        data_type: varchar
+    time_dimensions:
+      - name: order_date
+        expr: order_date
+        data_type: date
+    facts:
+      - name: subtotal_amount
+        expr: subtotal_amount
+        data_type: double
+      - name: discount_amount
+        expr: discount_amount
+        data_type: double
+      - name: tax_amount
+        expr: tax_amount
+        data_type: double
+      - name: shipping_amount
+        expr: shipping_amount
+        data_type: double
+      - name: total_amount
+        expr: total_amount
+        data_type: double
+    metrics:
+      - name: gross_sales
+        metric_type: sum
+        expr: subtotal_amount
+      - name: total_discount
+        metric_type: sum
+        expr: discount_amount
+      - name: total_tax
+        metric_type: sum
+        expr: tax_amount
+      - name: total_shipping
+        metric_type: sum
+        expr: shipping_amount
+      - name: net_sales
+        metric_type: sum
+        expr: total_amount
+      - name: order_count
+        metric_type: count
+        expr: order_id
+      - name: average_order_value
+        metric_type: expr
+        expr: net_sales / order_count
+
+  - name: customers
+    base_table:
+      table: customers
+    primary_key:
+      columns: [customer_id]
+    dimensions:
+      - name: customer_id
+        expr: customer_id
+        data_type: varchar
+      - name: customer_name
+        expr: customer_name
+        data_type: varchar
+      - name: customer_city
+        expr: city
+        data_type: varchar
+      - name: customer_state
+        expr: state
+        data_type: varchar
+      - name: customer_country
+        expr: country
+        data_type: varchar
+    time_dimensions:
+      - name: signup_date
+        expr: signup_date
+        data_type: date
+
+joins:
+  - name: orders_to_customers
+    left_table: orders
+    right_table: customers
+    join_type: left
+    join_expr: LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id
