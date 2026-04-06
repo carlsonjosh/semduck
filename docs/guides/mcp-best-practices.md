@@ -65,7 +65,7 @@ That pattern makes it obvious when a question should hit local experimentation v
 
 Users need both server configuration and standing instructions.
 
-For Codex Desktop or other MCP clients, recommend:
+For Codex Desktop, Claude Desktop or other MCP clients, recommend:
 
 1. Register each Semduck MCP server separately.
 2. Use names that encode domain and environment.

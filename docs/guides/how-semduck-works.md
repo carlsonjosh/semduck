@@ -3,7 +3,7 @@
 Semduck has a small runtime model:
 
 1. A semantic definition is authored in YAML or semantic DDL.
-2. The definition is validated and loaded into a registry stored in DuckDB.
+2. The definition is validated and loaded into a registry stored in the same DuckDB file as your data.
 3. A user writes a semantic request against a named view.
 4. The planner resolves dimensions, metrics, joins, and filters.
 5. The compiler emits SQL.
