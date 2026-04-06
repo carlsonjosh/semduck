@@ -6,9 +6,9 @@ Full documentation lives in the GitHub Pages docs site for this repository. This
 
 Supported baseline:
 
-- Python `3.11` to `3.12`
+- Python `3.11` to `3.13`
 - DuckDB `1.4+`
-- `dbt-duckdb` `1.10.x` for the optional dbt plugin path
+- `dbt-duckdb` `1.9.x` for the optional dbt plugin path
 
 ## Install
 
@@ -169,6 +169,7 @@ The design note for that boundary lives in [`_project/decisions/remove_yaml_in_d
 - In-memory Python quickstart: [`examples/quickstart.py`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/quickstart.py)
 - Query an existing database from Python: [`examples/query_existing_db.py`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/query_existing_db.py)
 - Query an existing database from the CLI: [`examples/query_existing_db_cli.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/query_existing_db_cli.sh)
+- Use `ask_question(...)` from Python: [`examples/ask_existing_db.py`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_existing_db.py)
 - Register an Ollama provider config and use `semduck ask`: [`examples/ask_existing_db_cli.sh`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_existing_db_cli.sh)
 - Example Ollama provider config: [`examples/ask_ollama_config.yaml`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_ollama_config.yaml)
 - Example OpenAI-compatible local provider config: [`examples/ask_openai_compatible_config.yaml`](https://github.com/carlsonjosh/semduck/blob/main/packages/semduck/examples/ask_openai_compatible_config.yaml)

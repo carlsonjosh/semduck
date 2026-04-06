@@ -2,29 +2,17 @@
 
 Semantic views for DuckDB.
 
-Semduck is for people doing serious analysis on their local machine with DuckDB who are tired of rebuilding the same joins, metrics, and business logic in raw SQL. It lets you define semantic views once, then query them consistently from Python, the CLI, dbt, MCP clients, or an `ask` workflow.
+You should not need a cloud license to get a usable semantic layer. Semduck brings semantic views directly into DuckDB so you can define business logic once and reuse it locally across analysis workflows.
+
+Stop rebuilding the same joins, metrics, and snippets. Define semantic views **once** in the database. Reuse them across queries, scripts, dbt pipelines, and machine workflows.
+
+## How it works
+
+Views are stored in DuckDB alongside your data for easy reuse later.
+
+Query dimensions and metrics using a semantic request. Or use the `ask` framework to ask natural language questions and have a partner LLM (even one hosted locally) build and run the request for you. 
 
 Humans can use it. Machines can use it. Both get the same semantic contract.
-
-## Why It Matters
-
-DuckDB is fast. Recreating analytics logic is not.
-
-Without a semantic layer, every useful question turns into hand-written SQL:
-
-- metrics get redefined across notebooks and scripts
-- joins get copied, edited, and broken
-- analysts know the question but still have to reconstruct the query
-- agents and apps can reach the database, but not the meaning of the data
-
-Semduck fixes that by storing semantic views in DuckDB and compiling semantic requests into SQL.
-
-## What You Do With It
-
-- Define metrics, dimensions, and joins once
-- Query those definitions with a compact request language
-- Reuse the same runtime from local scripts, notebooks, tools, and agents
-- Expose DuckDB analysis to humans and machines without making raw SQL the interface
 
 ## Quick Example
 
@@ -38,36 +26,88 @@ semduck query --db demo.duckdb --request "orders_semantic dimensions region metr
 
 Instead of writing SQL, you ask for the business objects you care about. Semduck resolves the view, joins, and metric definitions for you.
 
+Semantic requests can be executed in Python, dbt, or a CLI. The `ask` framework can be used from Python, the CLI, or an MCP client.
+
 ## What A Semantic View Looks Like
 
+### In YAML
 ```yaml
 name: orders_semantic
 tables:
   - name: orders
     base_table:
       table: orders
+    time_dimensions:
+      - name: order_date
+        expr: order_date
     dimensions:
+      - name: order_id
+        expr: order_id
       - name: region
         expr: region
     metrics:
       - name: total_revenue
-        metric_type: sum
-        expr: revenue
+        expr: sum(order_total)
+      - name: order_count
+        expr: count(order_id)
 ```
 
-## How It Works
+### In DDL
+```sql
+create semantic view orders_semantic as
+table orders as fct_orders
+  primary key (order_id)
+  time_dimensions (
+    order_date as order_date
+  )
+  dimensions (
+    order_id as order_id,
+    region as region,
+  )
+  metrics (
+    sum(order_total) as total_revenue,
+    count(order_id) as order_count,
+  )
+```
 
-1. Define a semantic view in YAML or semantic DDL.
-2. Load it into a registry stored in DuckDB.
-3. Query it with dimensions, metrics, and filters.
-4. Compile to SQL or execute directly.
+## What A Semantic Request Looks Like
+
+### In CLI
+`semduck query --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"`
+
+You can also use derived dimensions and metrics in the request...
+`semduck query --db demo.duckdb --request "orders_semantic dimensions date_trunc('month', order_date) as order_month, region metrics total_revenue, order_count, total_revenue / order_count as average_ticket_size"`
+
+Or use the ask framework to get assistance from an LLM (with a bit more configuration)...
+`semduck ask --db demo.duckdb --config path/to/config.yaml --question "What is revenue by region?"`
+
+### In a dbt project
+
+```sql
+select *
+from {{
+  dbt_semduck.from_query(
+    ref('orders_semantic')
+    dimensions
+      date_trunc('month', order_date) as order_month, 
+      region 
+    metrics 
+      total_revenue,
+      order_count, 
+      total_revenue / order_count as average_ticket_size
+  )
+}}
+```
+
+### In Python
+ See the [Python package README](packages/semduck/README.md) for more examples.
 
 The same runtime powers:
 
 - Python and CLI workflows
-- dbt projects through `dbt-semduck`
+- dbt projects through a dbt package `dbt-semduck`
 - MCP clients that need a tool-friendly analytics surface
-- `semduck ask` for natural-language analytics flows
+- `semduck ask` CLI for natural-language analytics flows
 
 ## Start Here
 
@@ -89,16 +129,8 @@ The same runtime powers:
 - [`integration_tests`](integration_tests): end-to-end dbt integration coverage
 - [`examples/test_fixtures`](examples/test_fixtures): fixture projects used by automated tests
 
-## Development
-
-```bash
-uv sync
-uv run pytest
-uv run tox
-```
-
 ## Compatibility Baseline
 
 - Python: `3.11` through `3.13`
 - DuckDB: `1.4+`
-- dbt integration: `dbt-duckdb` `1.10.x` or newer within the supported range
+- dbt integration: `dbt-duckdb` `1.9.x` or newer within the supported range

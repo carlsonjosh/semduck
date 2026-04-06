@@ -24,6 +24,7 @@ The repository includes example configs for:
 
 - Ollama: `packages/semduck/examples/ask_ollama_config.yaml`
 - OpenAI-compatible endpoints: `packages/semduck/examples/ask_openai_compatible_config.yaml`
+- Python API example: `packages/semduck/examples/ask_existing_db.py`
 
 Example:
 
@@ -33,6 +34,23 @@ semduck ask \
   --config packages/semduck/examples/ask_ollama_config.yaml \
   --question "What is total revenue by customer name?" \
   --sql --table --summary
+```
+
+Python:
+
+```python
+from semduck import ask_question, format_ask_result_text
+
+result = ask_question(
+    "examples/dbt_example/jaffle_shop.duckdb",
+    "What is total revenue by customer name?",
+    config="packages/semduck/examples/ask_ollama_config.yaml",
+    include_sql=True,
+    include_table=True,
+    include_summary=True,
+)
+
+print(format_ask_result_text(result))
 ```
 
 ## Planner And Summary Models

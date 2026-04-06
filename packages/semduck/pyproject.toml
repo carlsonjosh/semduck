@@ -34,7 +34,7 @@ Issues = "https://github.com/carlsonjosh/semduck/issues"
 
 [project.optional-dependencies]
 dbt = [
-  "dbt-duckdb>=1.10,<1.11",
+  "dbt-duckdb>=1.9,<1.11",
 ]
 
 [project.scripts]

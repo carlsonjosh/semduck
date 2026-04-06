@@ -10,6 +10,7 @@ The repository already includes several runnable examples. This page is the inde
 
 ## Ask
 
+- `packages/semduck/examples/ask_existing_db.py`: call `ask_question(...)` from Python against the example database.
 - `packages/semduck/examples/ask_existing_db_cli.sh`: run `semduck ask` against the example database.
 - `packages/semduck/examples/ask_ollama_config.yaml`: example Ollama configuration.
 - `packages/semduck/examples/ask_openai_compatible_config.yaml`: example OpenAI-compatible configuration.
