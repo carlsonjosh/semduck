@@ -50,8 +50,8 @@ def test_missing_direct_join_rejected(conn):
     conn.execute(
         """
         insert into semantic.metrics
-        (view_name, table_name, metric_name, metric_type, expr)
-        values ('sample', 'a', 'm1', 'sum', 'col1')
+        (view_name, table_name, metric_name, expr)
+        values ('sample', 'a', 'm1', 'sum(col1)')
         """
     )
     conn.execute(
@@ -129,9 +129,9 @@ def test_cross_table_metric_reference_rejected(conn):
     conn.execute(
         """
         insert into semantic.metrics
-        (view_name, table_name, metric_name, metric_type, expr)
+        (view_name, table_name, metric_name, expr)
         values
-        ('sample', 'orders', 'bad_metric', 'sum', 'customer_value')
+        ('sample', 'orders', 'bad_metric', 'sum(customer_value)')
         """
     )
     registry = load_semantic_view_registry(conn, "sample")

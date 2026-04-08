@@ -32,6 +32,8 @@ SQL_KEYWORDS = {
     "distinct",
 }
 
+AGGREGATE_FUNCTIONS = {"sum", "count", "avg", "min", "max"}
+
 
 def collect_expr_identifiers(expr: str) -> list[str]:
     tokens = re.split(r"('(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|\W)", expr)
@@ -109,22 +111,15 @@ def qualify_expr(expr: str, alias: str) -> str:
     return rewrite_expr_identifiers(expr, _PrefixedDict())
 
 
-def wrap_metric_expr(metric_type: str | None, expr: str) -> str:
-    if metric_type == "sum":
-        return f"sum({expr})"
-    if metric_type == "count":
-        if expr.strip() == "*":
-            return "count(*)"
-        return f"count({expr})"
-    if metric_type == "count_distinct":
-        return f"count(distinct {expr})"
-    if metric_type == "avg":
-        return f"avg({expr})"
-    return expr
-
-
-def qualify_metric_expr(metric: SemanticObject, alias: str, *, expr: str | None = None) -> str:
-    metric_expr = (expr if expr is not None else metric.expr).strip()
-    if metric.metric_type in {"sum", "count", "count_distinct", "avg"}:
-        return wrap_metric_expr(metric.metric_type, qualify_expr(metric_expr, alias))
-    return qualify_expr(metric_expr, alias)
+def contains_aggregate_function(expr: str) -> bool:
+    tokens = re.split(r"('(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|\W)", expr)
+    for index, token in enumerate(tokens):
+        stripped = token.strip()
+        if not stripped:
+            continue
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", stripped):
+            continue
+        next_non_space = next((item for item in tokens[index + 1 :] if item.strip()), "")
+        if next_non_space == "(" and stripped.lower() in AGGREGATE_FUNCTIONS:
+            return True
+    return False

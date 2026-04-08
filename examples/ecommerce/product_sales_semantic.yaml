@@ -29,22 +29,16 @@ tables:
         data_type: double
     metrics:
       - name: units_sold
-        metric_type: sum
-        expr: quantity
+        expr: sum(quantity)
       - name: gross_item_sales
-        metric_type: sum
-        expr: gross_item_amount
+        expr: sum(gross_item_amount)
       - name: item_discount
-        metric_type: sum
-        expr: discount_item_amount
+        expr: sum(discount_item_amount)
       - name: net_item_sales
-        metric_type: sum
-        expr: net_item_amount
+        expr: sum(net_item_amount)
       - name: line_count
-        metric_type: count
-        expr: order_item_id
+        expr: count(order_item_id)
       - name: average_selling_price
-        metric_type: expr
         expr: net_item_sales / units_sold
 
   - name: products

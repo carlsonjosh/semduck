@@ -126,13 +126,12 @@ tables:
         expr: region
     metrics:
       - name: order_count
-        metric_type: count
-        expr: order_id
+        expr: count(order_id)
 """)
 
 load_semantic_ddl(conn, """
 create semantic view replacement_sample as
-table orders as main.orders
+table main.orders as orders
   dimensions (
     region as region
   )

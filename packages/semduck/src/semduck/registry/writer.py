@@ -130,16 +130,14 @@ def write_semantic_view(
                 conn.execute(
                     """
                     insert into semantic.metrics (
-                        view_name, table_name, metric_name, metric_type, expr, default_agg, description
-                    ) values (?, ?, ?, ?, ?, ?, ?)
+                        view_name, table_name, metric_name, expr, description
+                    ) values (?, ?, ?, ?, ?)
                     """,
                     [
                         view_name,
                         table_name,
                         metric["name"],
-                        metric["metric_type"],
                         metric["expr"],
-                        metric.get("default_agg"),
                         metric.get("description"),
                     ],
                 )

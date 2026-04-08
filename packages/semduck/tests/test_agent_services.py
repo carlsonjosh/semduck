@@ -94,7 +94,7 @@ def test_load_definition_service_loads_from_ddl(conn, tmp_path):
     ddl_path.write_text(
         """
         create semantic view sample as
-        table orders as main.orders
+        table main.orders as sample_orders
           dimensions (
             region as region
           )

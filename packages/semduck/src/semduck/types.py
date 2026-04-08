@@ -51,8 +51,6 @@ class SemanticObject:
     expr: str
     data_type: Optional[str] = None
     table_name: Optional[str] = None
-    default_agg: Optional[str] = None
-    metric_type: Optional[str] = None
 
 
 @dataclass
@@ -96,7 +94,6 @@ class ResolvedMetric:
     table_name: str
     alias: str
     expr_sql: str
-    metric_type: str
 
 
 @dataclass

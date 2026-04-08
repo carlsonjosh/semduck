@@ -42,25 +42,18 @@ tables:
         data_type: double
     metrics:
       - name: gross_sales
-        metric_type: sum
-        expr: subtotal_amount
+        expr: sum(subtotal_amount)
       - name: total_discount
-        metric_type: sum
-        expr: discount_amount
+        expr: sum(discount_amount)
       - name: total_tax
-        metric_type: sum
-        expr: tax_amount
+        expr: sum(tax_amount)
       - name: total_shipping
-        metric_type: sum
-        expr: shipping_amount
+        expr: sum(shipping_amount)
       - name: net_sales
-        metric_type: sum
-        expr: total_amount
+        expr: sum(total_amount)
       - name: order_count
-        metric_type: count
-        expr: order_id
+        expr: count(order_id)
       - name: average_order_value
-        metric_type: expr
         expr: net_sales / order_count
 
   - name: customers

@@ -22,8 +22,7 @@ tables:
         expr: region
     metrics:
       - name: order_count
-        metric_type: count
-        expr: order_id
+        expr: count(order_id)
 ```
 
 Optional fields for dimensions and metrics can make the definition more self-describing:
@@ -43,11 +42,9 @@ tables:
         description: Sales region used for grouping
     metrics:
       - name: total_revenue
-        metric_type: sum
-        expr: revenue
+        expr: sum(revenue)
         description: Sum of order revenue
       - name: margin_pct
-        metric_type: expr
         expr: total_profit / total_revenue
         description: Profit margin ratio
 ```
@@ -57,7 +54,7 @@ Supported optional fields in YAML today:
 - semantic view: `description`
 - table: `description`
 - dimensions, time dimensions, and facts: `data_type`, `description`
-- metrics: `default_agg`, `description`
+- metrics: `description`
 - joins: `description`
 
 Validation rules enforced by the loader:
@@ -69,7 +66,7 @@ Validation rules enforced by the loader:
 - each table needs `base_table.table`
 - semantic object names must be unique within a table
 - dimensions, time dimensions, and facts require `name` and `expr`
-- metrics require `name`, `metric_type`, and `expr`
+- metrics require `name` and `expr`
 - joins must reference declared tables and include the required join fields
 
 Reference example: `packages/semduck/examples/orders_semantic.yaml`
@@ -80,21 +77,21 @@ Example:
 
 ```sql
 create semantic view orders_semantic as
-table orders as main.orders
+table main.orders as orders
   primary key (order_id)
   dimensions (
     region as region type varchar description 'Sales region used for grouping'
   )
   metrics (
     sum(revenue) as total_revenue description 'Sum of order revenue',
-    total_revenue / count(order_id) as avg_order_value default_agg avg description 'Average revenue per order'
+    total_revenue / count(order_id) as avg_order_value description 'Average revenue per order'
   );
 ```
 
 DDL optional fields mirror the same ideas:
 
 - dimensions, time dimensions, and facts can include `type` and `description`
-- metrics can include `default_agg` and `description`
+- metrics can include `description`
 - tables and joins can include a separate `description '...'` line
 
 Reference examples:

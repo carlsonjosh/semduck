@@ -89,8 +89,6 @@ def _describe_object(obj: SemanticObject) -> SemanticObjectDescriptor:
         object_type=obj.object_type,
         expr=obj.expr,
         data_type=obj.data_type,
-        default_agg=obj.default_agg,
-        metric_type=obj.metric_type,
     )
 
 

@@ -5,10 +5,9 @@ import re
 
 from semduck.compiler.qualifier import (
     collect_expr_identifiers,
+    contains_aggregate_function,
     qualify_expr,
-    qualify_metric_expr,
     rewrite_expr_identifiers,
-    wrap_metric_expr,
 )
 from semduck.errors import SemanticResolutionError
 from semduck.planner.joins import choose_anchor_table, resolve_required_joins
@@ -30,7 +29,6 @@ from semduck.types import (
     SemanticViewRegistry,
 )
 
-AGGREGATE_METRIC_TYPES = {"sum", "count", "count_distinct", "avg"}
 SIMPLE_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -289,53 +287,6 @@ def _resolve_metric_name(
             f"Metric definition cannot reference semantic objects from another table: {metric_name} -> {', '.join(names)}"
         )
 
-    if metric.metric_type in AGGREGATE_METRIC_TYPES:
-        base_expressions_by_alias = {
-            name: _fact_base_expression(table.facts[name], table.alias) for name in local_fact_refs
-        }
-        known_aliases = {name: name for name in local_fact_refs}
-        for ref_name in local_metric_refs:
-            resolution = _resolve_metric_name(
-                ref_name,
-                metric_index,
-                fact_index,
-                metric_resolution_cache,
-                (*stack, metric_name),
-            )
-            if resolution.stage != "base":
-                raise SemanticResolutionError(
-                    f"Aggregate metric can only reference row-level helper metrics: {metric_name} -> {ref_name}"
-                )
-            for base_expression in resolution.base_expressions:
-                base_expressions_by_alias.setdefault(base_expression.alias, base_expression)
-            known_aliases[ref_name] = resolution.reference_sql
-        if metric.expr.strip() == "*":
-            aggregate_expr_sql = "count(*)"
-        else:
-            if len(refs) == 1 and refs[0] in known_aliases and metric.expr.strip() == refs[0]:
-                input_alias = known_aliases[refs[0]]
-            else:
-                input_alias = f"{metric_name}__input"
-                rewritten_expr = _qualify_base_stage_expr(metric.expr, table, known_aliases)
-                base_expressions_by_alias[input_alias] = ResolvedBaseExpression(alias=input_alias, expr_sql=rewritten_expr)
-            aggregate_expr_sql = wrap_metric_expr(metric.metric_type, input_alias)
-        resolution = _MetricResolution(
-            base_expressions=list(base_expressions_by_alias.values()),
-            resolved_metrics=[
-                ResolvedMetric(
-                    request_name=metric_name,
-                    table_name=table.name,
-                    alias=table.alias,
-                    expr_sql=aggregate_expr_sql,
-                    metric_type=metric.metric_type or "unknown",
-                )
-            ],
-            reference_sql=metric_name,
-            stage="aggregate",
-        )
-        metric_resolution_cache[metric_name] = resolution
-        return resolution
-
     resolved_metrics_by_name: dict[str, ResolvedMetric] = {}
     base_expressions_by_alias: dict[str, ResolvedBaseExpression] = {}
     metric_aliases: dict[str, str] = {}
@@ -356,6 +307,42 @@ def _resolve_metric_name(
             metric_aliases[ref_name] = resolution.reference_sql
         else:
             aggregate_metric_refs.append(ref_name)
+
+    aggregate_expr = contains_aggregate_function(metric.expr)
+
+    if aggregate_expr:
+        if aggregate_metric_refs:
+            raise SemanticResolutionError(
+                f"Aggregate metric cannot reference aggregate metrics: {metric_name} -> {', '.join(sorted(aggregate_metric_refs))}"
+            )
+        for ref_name in local_fact_refs:
+            base_expressions_by_alias.setdefault(ref_name, _fact_base_expression(table.facts[ref_name], table.alias))
+        known_aliases = {name: name for name in local_fact_refs}
+        known_aliases.update(metric_aliases)
+        for ref_name in physical_refs:
+            alias = f"{metric_name}__{ref_name}"
+            base_expressions_by_alias.setdefault(
+                alias,
+                ResolvedBaseExpression(alias=alias, expr_sql=qualify_expr(ref_name, table.alias)),
+            )
+            known_aliases[ref_name] = alias
+        aggregate_expr_sql = rewrite_expr_identifiers(metric.expr, known_aliases)
+        resolution = _MetricResolution(
+            base_expressions=list(base_expressions_by_alias.values()),
+            resolved_metrics=[
+                *list(resolved_metrics_by_name.values()),
+                ResolvedMetric(
+                    request_name=metric_name,
+                    table_name=table.name,
+                    alias=table.alias,
+                    expr_sql=aggregate_expr_sql,
+                ),
+            ],
+            reference_sql=metric_name,
+            stage="aggregate",
+        )
+        metric_resolution_cache[metric_name] = resolution
+        return resolution
 
     if aggregate_metric_refs and (local_fact_refs or physical_refs or metric_aliases):
         resolution = _MetricResolution(

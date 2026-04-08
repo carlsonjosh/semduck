@@ -25,20 +25,15 @@ tables:
         data_type: double
     metrics:
       - name: row_profit_metric
-        metric_type: expr
         expr: order_profit
       - name: total_revenue
-        metric_type: sum
-        expr: order_revenue
+        expr: sum(order_revenue)
       - name: total_profit
-        metric_type: sum
-        expr: row_profit_metric
+        expr: sum(row_profit_metric)
       - name: margin_pct
-        metric_type: expr
         expr: total_profit / total_revenue
       - name: order_count
-        metric_type: count
-        expr: order_id
+        expr: count(order_id)
 
   - name: customers
     base_table:

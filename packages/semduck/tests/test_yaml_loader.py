@@ -13,8 +13,7 @@ tables:
         expr: region
     metrics:
       - name: order_count
-        metric_type: count
-        expr: order_id
+        expr: count(order_id)
 """
 
 
@@ -108,13 +107,10 @@ tables:
         expr: revenue - unit_costs
     metrics:
       - name: total_revenue
-        metric_type: sum
-        expr: order_revenue
+        expr: sum(order_revenue)
       - name: total_profit
-        metric_type: sum
-        expr: order_profit
+        expr: sum(order_profit)
       - name: margin_pct
-        metric_type: expr
         expr: total_profit / total_revenue
 """
     load_semantic_yaml(conn, yaml_text)
