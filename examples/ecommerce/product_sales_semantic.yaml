@@ -1,0 +1,101 @@
+name: product_sales_semantic
+description: Item-level sales analytics across products, categories, and order context
+
+tables:
+  - name: order_items
+    base_table:
+      table: order_items
+    primary_key:
+      columns: [order_item_id]
+    dimensions:
+      - name: order_item_id
+        expr: order_item_id
+        data_type: varchar
+    facts:
+      - name: quantity
+        expr: quantity
+        data_type: integer
+      - name: unit_price
+        expr: unit_price
+        data_type: double
+      - name: gross_item_amount
+        expr: gross_item_amount
+        data_type: double
+      - name: discount_item_amount
+        expr: discount_item_amount
+        data_type: double
+      - name: net_item_amount
+        expr: net_item_amount
+        data_type: double
+    metrics:
+      - name: units_sold
+        expr: sum(quantity)
+      - name: gross_item_sales
+        expr: sum(gross_item_amount)
+      - name: item_discount
+        expr: sum(discount_item_amount)
+      - name: net_item_sales
+        expr: sum(net_item_amount)
+      - name: line_count
+        expr: count(order_item_id)
+      - name: average_selling_price
+        expr: net_item_sales / units_sold
+
+  - name: products
+    base_table:
+      table: products
+    primary_key:
+      columns: [product_id]
+    dimensions:
+      - name: product_id
+        expr: product_id
+        data_type: varchar
+      - name: product_name
+        expr: product_name
+        data_type: varchar
+      - name: category_id
+        expr: category_id
+        data_type: varchar
+      - name: brand_name
+        expr: brand_name
+        data_type: varchar
+      - name: is_active
+        expr: is_active
+        data_type: boolean
+    time_dimensions:
+      - name: launch_date
+        expr: launch_date
+        data_type: date
+
+  - name: orders
+    base_table:
+      table: orders
+    primary_key:
+      columns: [order_id]
+    dimensions:
+      - name: order_status
+        expr: order_status
+        data_type: varchar
+      - name: sales_channel
+        expr: sales_channel
+        data_type: varchar
+      - name: payment_method
+        expr: payment_method
+        data_type: varchar
+    time_dimensions:
+      - name: order_date
+        expr: order_date
+        data_type: date
+
+joins:
+  - name: order_items_to_products
+    left_table: order_items
+    right_table: products
+    join_type: left
+    join_expr: LEFT_TABLE.product_id = RIGHT_TABLE.product_id
+
+  - name: order_items_to_orders
+    left_table: order_items
+    right_table: orders
+    join_type: left
+    join_expr: LEFT_TABLE.order_id = RIGHT_TABLE.order_id

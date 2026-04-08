@@ -50,9 +50,7 @@ create table if not exists semantic.metrics (
     view_name varchar not null,
     table_name varchar not null,
     metric_name varchar not null,
-    metric_type varchar not null,
     expr text not null,
-    default_agg varchar,
     description varchar,
     created_at timestamp default current_timestamp,
     updated_at timestamp default current_timestamp,
@@ -95,7 +93,5 @@ select
     view_name,
     table_name,
     metric_name,
-    metric_type,
     expr
 from semantic.metrics;
-

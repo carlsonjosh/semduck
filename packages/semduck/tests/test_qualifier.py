@@ -1,5 +1,4 @@
-from semduck.compiler.qualifier import qualify_expr, qualify_metric_expr
-from semduck.types import SemanticObject
+from semduck.compiler.qualifier import contains_aggregate_function, qualify_expr
 
 
 def test_qualify_bare_identifier():
@@ -14,9 +13,10 @@ def test_preserve_function_name():
     assert qualify_expr("date_trunc('day', order_date)", "o") == "date_trunc('day', o.order_date)"
 
 
-def test_count_star_metric():
-    metric = SemanticObject(name="row_count", object_type="metric", expr="*", metric_type="count")
-    assert qualify_metric_expr(metric, "o") == "count(*)"
+def test_detect_aggregate_function():
+    assert contains_aggregate_function("count(*)") is True
+    assert contains_aggregate_function("sum(order_total) / count(order_id)") is True
+    assert contains_aggregate_function("total_revenue / order_count") is False
 
 
 def test_preserve_string_literals():

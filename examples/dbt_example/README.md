@@ -12,9 +12,9 @@ This is a small dbt-duckdb example showing how to define and query a semantic vi
 
 ## Profile
 
-This example includes a local [`profiles.yml`](/Users/joshuacarlson/repos/duckdb_sem_view_extension/examples/dbt_jaffle_shop/profiles.yml) with project-relative defaults:
+This example includes a local [`profiles.yml`](profiles.yml) with project-relative defaults:
 
-- DuckDB database at `examples/dbt_jaffle_shop/jaffle_shop.duckdb`
+- DuckDB database at `examples/dbt_example/jaffle_shop.duckdb`
 - `module_paths` pointed at `../../packages/semduck/src`
 
 ## Run
@@ -54,3 +54,5 @@ with semduck_query as (
 select *
 from semduck_query
 ```
+
+See the main docs site for installation, package boundaries, and a broader dbt integration guide.

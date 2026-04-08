@@ -3,7 +3,7 @@
 {{ config(materialized='semduck_semantic') }}
 
 create semantic view raw_orders_semantic as
-table raw_orders as {{ source('raw', 'orders_seed') }}
+table {{ source('raw', 'orders_seed') }} as raw_orders
   dimensions (
     region as region
   )

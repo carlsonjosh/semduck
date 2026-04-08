@@ -1,0 +1,89 @@
+name: customer_semantic
+description: Customer-centric ecommerce analytics with order history and segment rollups
+
+tables:
+  - name: customers
+    base_table:
+      table: customers
+    primary_key:
+      columns: [customer_id]
+    dimensions:
+      - name: customer_id
+        expr: customer_id
+        data_type: varchar
+      - name: customer_name
+        expr: customer_name
+        data_type: varchar
+      - name: email
+        expr: email
+        data_type: varchar
+      - name: city
+        expr: city
+        data_type: varchar
+      - name: state
+        expr: state
+        data_type: varchar
+      - name: country
+        expr: country
+        data_type: varchar
+    time_dimensions:
+      - name: signup_date
+        expr: signup_date
+        data_type: date
+    metrics:
+      - name: customer_count
+        expr: count(distinct customer_id)
+
+  - name: customer_segments
+    base_table:
+      table: customer_segments
+    primary_key:
+      columns: [segment_id]
+    dimensions:
+      - name: segment_name
+        expr: segment_name
+        data_type: varchar
+      - name: segment_type
+        expr: segment_type
+        data_type: varchar
+
+  - name: orders
+    base_table:
+      table: orders
+    primary_key:
+      columns: [order_id]
+    dimensions:
+      - name: order_status
+        expr: order_status
+        data_type: varchar
+      - name: sales_channel
+        expr: sales_channel
+        data_type: varchar
+    time_dimensions:
+      - name: order_date
+        expr: order_date
+        data_type: date
+    facts:
+      - name: total_amount
+        expr: total_amount
+        data_type: double
+    metrics:
+      - name: order_count
+        expr: count(order_id)
+      - name: lifetime_value
+        expr: sum(total_amount)
+      - name: average_order_value
+        expr: lifetime_value / order_count
+
+joins:
+  - name: customers_to_segments
+    left_table: customers
+    right_table: customer_segments
+    join_type: left
+    join_expr: LEFT_TABLE.segment_id = RIGHT_TABLE.segment_id
+
+  - name: customers_to_orders
+    left_table: customers
+    right_table: orders
+    join_type: left
+    join_expr: LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id
