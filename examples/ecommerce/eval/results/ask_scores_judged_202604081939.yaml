@@ -1,0 +1,1125 @@
+version: 1
+dataset: ecommerce
+generated_at: '2026-04-09T01:21:08.219086+00:00'
+source_eval_set: /Users/joshuacarlson/repos/semduck/examples/ecommerce/eval/eval_set.yaml
+source_ask_results: examples/ecommerce/eval/results/ask_results_202604081939.yaml
+judge:
+  enabled: true
+  config: packages/semduck/examples/ask_ollama_config.yaml
+  provider: ollama
+  model: gemma4:e4b
+summary:
+  case_count: 20
+  average_final_score: 51.3
+  rating_counts:
+    Excellent: 4
+    Failing: 11
+    Good: 4
+    Weak: 1
+  hard_failure_counts:
+    execution_failed: 1
+    missing_or_substituted_metric: 2
+    missing_requested_time_grain: 6
+    missing_required_dimension: 7
+    summary_table_mismatch: 1
+    unresolved_join_path: 1
+    unsupported_handling_runtime_error: 1
+    unsupported_question_answered: 1
+    wrong_semantic_view: 2
+cases:
+- id: EC-01
+  title: Monthly Topline Sales
+  question: What are net sales, order count, and average order value by month?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 3
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 2
+    communication_quality: 3
+    rationale: Failed to group by month grain as requested; presented daily data instead.
+      The semantic request correctly identified required metrics, but the output view
+      and grain are wrong according to checks.
+    improvement_actions:
+    - Group the results by month (e.g., using 'date_trunc('month', order_date)')).
+    - Ensure the dimension used reflects 'month' granularity.
+  judge_error: null
+  hard_failures:
+  - missing_requested_time_grain
+  - missing_required_dimension
+  heuristic_raw_score: 40
+  heuristic_final_score: 29
+  raw_score: 36
+  final_score: 29
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: false
+    month_grain_present: false
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The semantic request omitted at least one required dimension from the eval spec.
+  - The result used raw dates instead of the requested month grain.
+  - 'Judge rationale: Failed to group by month grain as requested; presented daily
+    data instead. The semantic request correctly identified required metrics, but
+    the output view and grain are wrong according to checks.'
+  improvement_actions:
+  - Preserve all explicitly requested dimensions when building semantic requests.
+  - Map month-oriented questions to `date_trunc('month', ...)` in the planner.
+  - Group the results by month (e.g., using 'date_trunc('month', order_date)')).
+  - Ensure the dimension used reflects 'month' granularity.
+- id: EC-02
+  title: Channel Revenue Mix
+  question: Which sales channels generate the most net sales?
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 3
+    communication_quality: 4
+    rationale: The result correctly identifies the necessary dimensions (sales_channel)
+      and metrics (net_sales) and provides the correct data, answering which channels
+      generate sales. However, the question asks for the *most* sales, which implies
+      ranking, but the output table is not sorted by net_sales descending, failing
+      the strict ranking check.
+    improvement_actions:
+    - Ensure the final output/table is explicitly sorted by the target metric (net_sales)
+      in descending order to satisfy the 'ranking' question type.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 90
+  heuristic_final_score: 90
+  raw_score: 90
+  final_score: 90
+  rating: Excellent
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: false
+  rationale:
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - 'Judge rationale: The result correctly identifies the necessary dimensions (sales_channel)
+    and metrics (net_sales) and provides the correct data, answering which channels
+    generate sales. However, the question asks for the *most* sales, which implies
+    ranking, but the output table is not sorted by net_sales descending, failing the
+    strict ranking check.'
+  improvement_actions:
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Ensure the final output/table is explicitly sorted by the target metric (net_sales)
+    in descending order to satisfy the 'ranking' question type.
+- id: EC-03
+  title: Payment Method Comparison
+  question: Which payment methods have the highest average order value?
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 2
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 2
+    communication_quality: 4
+    rationale: The result includes the correct metrics and dimensions ('payment_method'
+      and 'average_order_value') and covers all comparison points, but it fails the
+      ranking requirement specified by the question type ('comparative_ranking') because
+      'ranking_sorted' is false and the heuristic explicitly notes the missing ORDER
+      BY clause.
+    improvement_actions:
+    - Sort the results in descending order by 'average_order_value' to directly address
+      the 'highest' portion of the question.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 90
+  heuristic_final_score: 90
+  raw_score: 86
+  final_score: 86
+  rating: Good
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: false
+  rationale:
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - 'Judge rationale: The result includes the correct metrics and dimensions (''payment_method''
+    and ''average_order_value'') and covers all comparison points, but it fails the
+    ranking requirement specified by the question type (''comparative_ranking'') because
+    ''ranking_sorted'' is false and the heuristic explicitly notes the missing ORDER
+    BY clause.'
+  improvement_actions:
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Sort the results in descending order by 'average_order_value' to directly address
+    the 'highest' portion of the question.
+- id: EC-04
+  title: Discount Trend By Channel
+  question: How much discount are we giving by channel and by month?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 3
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 2
+    communication_quality: 3
+    rationale: The result failed to aggregate the data to the required monthly grain
+      (date_trunc('month', order_date)). It displays raw dates, violating the 'month_by_sales_channel'
+      requirement.
+    improvement_actions:
+    - Aggregate total_discount to the month level using date_trunc('month', order_date)
+      as order_month in the grouping/selection.
+    - Ensure the output structure reflects the month-by-channel aggregation clearly.
+  judge_error: null
+  hard_failures:
+  - missing_requested_time_grain
+  - missing_required_dimension
+  heuristic_raw_score: 40
+  heuristic_final_score: 29
+  raw_score: 36
+  final_score: 29
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: false
+    month_grain_present: false
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The semantic request omitted at least one required dimension from the eval spec.
+  - The result used raw dates instead of the requested month grain.
+  - 'Judge rationale: The result failed to aggregate the data to the required monthly
+    grain (date_trunc(''month'', order_date)). It displays raw dates, violating the
+    ''month_by_sales_channel'' requirement.'
+  improvement_actions:
+  - Preserve all explicitly requested dimensions when building semantic requests.
+  - Map month-oriented questions to `date_trunc('month', ...)` in the planner.
+  - Aggregate total_discount to the month level using date_trunc('month', order_date)
+    as order_month in the grouping/selection.
+  - Ensure the output structure reflects the month-by-channel aggregation clearly.
+- id: EC-05
+  title: Geographic Revenue Ranking
+  question: Rank customer states by net sales.
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 2
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 2
+    communication_quality: 4
+    rationale: The result covers the correct dimensions and metrics for ranking by
+      net sales across customer states (high coverage). However, the 'checks' identified
+      that the result is not actually ranked (heuristic check failure), which violates
+      the core requirement of the question type. The communication is clear otherwise.
+    improvement_actions:
+    - Add an ORDER BY clause to the final output structure (or ensure the model sorts
+      the results) to correctly rank states by 'net_sales' in descending order.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 90
+  heuristic_final_score: 90
+  raw_score: 86
+  final_score: 86
+  rating: Good
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: false
+  rationale:
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - 'Judge rationale: The result covers the correct dimensions and metrics for ranking
+    by net sales across customer states (high coverage). However, the ''checks'' identified
+    that the result is not actually ranked (heuristic check failure), which violates
+    the core requirement of the question type. The communication is clear otherwise.'
+  improvement_actions:
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Add an ORDER BY clause to the final output structure (or ensure the model sorts
+    the results) to correctly rank states by 'net_sales' in descending order.
+- id: EC-06
+  title: Shipping And Tax Over Time
+  question: How much shipping revenue and tax are collected over time?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 2
+    communication_quality: 4
+    rationale: The query missed the required month grain, instead displaying raw daily
+      dates contrary to the expectation for time series analysis ('month'). Although
+      all required metrics are present, the date aggregation is incorrect, failing
+      to fully answer the question over time.
+    improvement_actions:
+    - Ensure the dimension used for time series aggregation is truncated to the month
+      level (e.g., date_trunc('month', order_date)).
+  judge_error: null
+  hard_failures:
+  - missing_requested_time_grain
+  - missing_required_dimension
+  heuristic_raw_score: 40
+  heuristic_final_score: 29
+  raw_score: 38
+  final_score: 29
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: false
+    month_grain_present: false
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The semantic request omitted at least one required dimension from the eval spec.
+  - The result used raw dates instead of the requested month grain.
+  - 'Judge rationale: The query missed the required month grain, instead displaying
+    raw daily dates contrary to the expectation for time series analysis (''month'').
+    Although all required metrics are present, the date aggregation is incorrect,
+    failing to fully answer the question over time.'
+  improvement_actions:
+  - Preserve all explicitly requested dimensions when building semantic requests.
+  - Map month-oriented questions to `date_trunc('month', ...)` in the planner.
+  - Ensure the dimension used for time series aggregation is truncated to the month
+    level (e.g., date_trunc('month', order_date)).
+- id: EC-07
+  title: Order Status Comparison
+  question: How do cancelled versus completed orders compare on gross sales and net
+    sales?
+  status: ok
+  scores:
+    question_coverage: 4
+    semantic_correctness: 5
+    analytical_quality: 5
+    communication_quality: 5
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 5
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 4
+    analytical_quality: 5
+    communication_quality: 5
+    rationale: The result includes the required metrics and dimension, but it displays
+      data for all order statuses ('pending', 'returned', etc.) instead of specifically
+      comparing only 'cancelled' versus 'completed' as requested.
+    improvement_actions:
+    - Filter the results to show only 'cancelled' and 'completed' order statuses to
+      directly answer the comparison question.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 100
+  heuristic_final_score: 100
+  raw_score: 94
+  final_score: 94
+  rating: Excellent
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The result matched the expected view, core fields, and baseline rubric checks.
+  - 'Judge rationale: The result includes the required metrics and dimension, but
+    it displays data for all order statuses (''pending'', ''returned'', etc.) instead
+    of specifically comparing only ''cancelled'' versus ''completed'' as requested.'
+  improvement_actions:
+  - 'Optional: add a judge-model pass for softer communication and analytical scoring.'
+  - Filter the results to show only 'cancelled' and 'completed' order statuses to
+    directly answer the comparison question.
+- id: EC-08
+  title: Customers By Segment
+  question: How many customers do we have by segment?
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 3
+    communication_quality: 4
+    rationale: The result covers all necessary dimensions and metrics for comparing
+      customer counts by segment, but failed to rank the results as implied by the
+      question type ('descriptive_ranking') and explicitly noted by a heuristic failure.
+    improvement_actions:
+    - Ensure the final output (or the generated SQL) includes an ORDER BY clause on
+      the metric (customer_count) to rank the segments, as implied by the question
+      type.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 90
+  heuristic_final_score: 90
+  raw_score: 90
+  final_score: 90
+  rating: Excellent
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: false
+  rationale:
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - 'Judge rationale: The result covers all necessary dimensions and metrics for comparing
+    customer counts by segment, but failed to rank the results as implied by the question
+    type (''descriptive_ranking'') and explicitly noted by a heuristic failure.'
+  improvement_actions:
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Ensure the final output (or the generated SQL) includes an ORDER BY clause on
+    the metric (customer_count) to rank the segments, as implied by the question type.
+- id: EC-09
+  title: Segment Lifetime Value
+  question: Which customer segments drive the most lifetime value?
+  status: error
+  scores:
+    question_coverage: 0
+    semantic_correctness: 0
+    analytical_quality: 0
+    communication_quality: 0
+    operational_efficiency: 1
+  heuristic_scores:
+    question_coverage: 0
+    semantic_correctness: 0
+    analytical_quality: 0
+    communication_quality: 1
+    operational_efficiency: 1
+  judge_scores:
+    question_coverage: 0
+    analytical_quality: 0
+    communication_quality: 0
+    rationale: The execution failed with a join error, resulting in no actionable
+      data output. This failure prevents answering the core question.
+    improvement_actions:
+    - Investigate the 'orders' to 'customer_segments' join path reported in the error
+      message to correct the semantic view definition.
+  judge_error: null
+  hard_failures:
+  - execution_failed
+  - unresolved_join_path
+  heuristic_raw_score: 4
+  heuristic_final_score: 4
+  raw_score: 2
+  final_score: 2
+  rating: Failing
+  checks: {}
+  rationale:
+  - Case failed during ask with error code `join`.
+  - No scored analytical result was produced.
+  - 'Judge rationale: The execution failed with a join error, resulting in no actionable
+    data output. This failure prevents answering the core question.'
+  improvement_actions:
+  - Improve planner handling for this question shape or enforce the expected semantic
+    view.
+  - Inspect the semantic request path for missing join guidance or unsupported multi-table
+    combinations.
+  - Investigate the 'orders' to 'customer_segments' join path reported in the error
+    message to correct the semantic view definition.
+- id: EC-10
+  title: Signup Cohort Growth
+  question: How many customers signed up each month?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 2
+    communication_quality: 4
+    rationale: Failed to aggregate dates to the month level but correctly showed customer
+      counts. The result uses raw dates instead of the required monthly grain.
+    improvement_actions:
+    - Group the results by truncating 'signup_date' to month level, as indicated by
+      the expected grouping logic (e.g., date_trunc('month', signup_date)).
+    - The output should aggregate the customer counts for all entries within the same
+      month.
+  judge_error: null
+  hard_failures:
+  - missing_requested_time_grain
+  - missing_required_dimension
+  heuristic_raw_score: 40
+  heuristic_final_score: 29
+  raw_score: 38
+  final_score: 29
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: false
+    month_grain_present: false
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The semantic request omitted at least one required dimension from the eval spec.
+  - The result used raw dates instead of the requested month grain.
+  - 'Judge rationale: Failed to aggregate dates to the month level but correctly showed
+    customer counts. The result uses raw dates instead of the required monthly grain.'
+  improvement_actions:
+  - Preserve all explicitly requested dimensions when building semantic requests.
+  - Map month-oriented questions to `date_trunc('month', ...)` in the planner.
+  - Group the results by truncating 'signup_date' to month level, as indicated by
+    the expected grouping logic (e.g., date_trunc('month', signup_date)).
+  - The output should aggregate the customer counts for all entries within the same
+    month.
+- id: EC-11
+  title: Lifetime Value By Signup Cohort
+  question: How does lifetime value vary by signup cohort?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 2
+    communication_quality: 4
+    rationale: The result fails to aggregate by the requested monthly grain (date_trunc('month',
+      signup_date) as signup_month), instead showing raw signup dates, which contradicts
+      the hard failure 'missing_requested_time_grain'.
+    improvement_actions:
+    - Ensure the output dimensions are aggregated to the requested monthly grain using
+      date truncation functions.
+  judge_error: null
+  hard_failures:
+  - missing_requested_time_grain
+  - missing_required_dimension
+  heuristic_raw_score: 40
+  heuristic_final_score: 29
+  raw_score: 38
+  final_score: 29
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: false
+    month_grain_present: false
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The semantic request omitted at least one required dimension from the eval spec.
+  - The result used raw dates instead of the requested month grain.
+  - 'Judge rationale: The result fails to aggregate by the requested monthly grain
+    (date_trunc(''month'', signup_date) as signup_month), instead showing raw signup
+    dates, which contradicts the hard failure ''missing_requested_time_grain''.'
+  improvement_actions:
+  - Preserve all explicitly requested dimensions when building semantic requests.
+  - Map month-oriented questions to `date_trunc('month', ...)` in the planner.
+  - Ensure the output dimensions are aggregated to the requested monthly grain using
+    date truncation functions.
+- id: EC-12
+  title: Segment And Channel Mix
+  question: How many orders come from each segment and sales channel combination?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 0
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 4
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 0
+    analytical_quality: 4
+    communication_quality: 5
+    operational_efficiency: 4
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 3
+    communication_quality: 4
+    rationale: Failed to include 'segment_name' as required by the question ('each
+      segment and sales channel combination?'), instead only using 'sales_channel'.
+    improvement_actions:
+    - Include 'segment_name' dimension to match the required grouping level for the
+      question.
+  judge_error: null
+  hard_failures:
+  - missing_required_dimension
+  - wrong_semantic_view
+  heuristic_raw_score: 40
+  heuristic_final_score: 29
+  raw_score: 34
+  final_score: 29
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: false
+    all_required_metrics_present: true
+    all_required_dimensions_present: false
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - Expected `customer_semantic` but the planner chose `orders_semantic`.
+  - The semantic request omitted at least one required dimension from the eval spec.
+  - 'Judge rationale: Failed to include ''segment_name'' as required by the question
+    (''each segment and sales channel combination?''), instead only using ''sales_channel''.'
+  improvement_actions:
+  - Tighten view-selection guidance for overlapping questions across views.
+  - Preserve all explicitly requested dimensions when building semantic requests.
+  - Include 'segment_name' dimension to match the required grouping level for the
+    question.
+- id: EC-13
+  title: Product Revenue Leaders
+  question: Which products generate the most net item sales?
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 2
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 2
+    communication_quality: 4
+    rationale: The result correctly covers all requested dimensions and metrics and
+      answers the core question, but the heuristic check correctly notes that the
+      output is not actually sorted/ranked, which is a crucial part of the 'ranking'
+      question type.
+    improvement_actions:
+    - Ensure the final presentation explicitly ranks the results (e.g., by adding
+      an ORDER BY clause or visually sorting the table/summary) to meet the 'ranking'
+      question type requirement.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 90
+  heuristic_final_score: 90
+  raw_score: 86
+  final_score: 86
+  rating: Good
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: false
+  rationale:
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - 'Judge rationale: The result correctly covers all requested dimensions and metrics
+    and answers the core question, but the heuristic check correctly notes that the
+    output is not actually sorted/ranked, which is a crucial part of the ''ranking''
+    question type.'
+  improvement_actions:
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Ensure the final presentation explicitly ranks the results (e.g., by adding an
+    ORDER BY clause or visually sorting the table/summary) to meet the 'ranking' question
+    type requirement.
+- id: EC-14
+  title: Brand And Category Volume
+  question: Which brands or categories sell the most units?
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 2
+    communication_quality: 3
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 3
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 2
+    communication_quality: 3
+    rationale: The result covers the correct dimensions and metric, but since the
+      question asks for a ranking, and the output is not sorted (as flagged by the
+      heuristic check), the analytical quality suffers.
+    improvement_actions:
+    - Ensure the final output is explicitly sorted (ranked) by the metric of interest
+      (units_sold) in descending order to match the 'ranking' question type.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 88
+  heuristic_final_score: 88
+  raw_score: 84
+  final_score: 84
+  rating: Good
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: false
+  rationale:
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - The result omits rows but the answer text does not clearly signal truncation.
+  - 'Judge rationale: The result covers the correct dimensions and metric, but since
+    the question asks for a ranking, and the output is not sorted (as flagged by the
+    heuristic check), the analytical quality suffers.'
+  improvement_actions:
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Mention truncation explicitly when the displayed result is partial.
+  - Ensure the final output is explicitly sorted (ranked) by the metric of interest
+    (units_sold) in descending order to match the 'ranking' question type.
+- id: EC-15
+  title: Average Selling Price By Brand
+  question: What is average selling price by brand?
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 5
+    communication_quality: 5
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 5
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 5
+    communication_quality: 5
+    rationale: The result correctly provides the average selling price for every brand,
+      matching the requested dimensions, metrics, and grain structure.
+    improvement_actions:
+    - None needed.
+  judge_error: null
+  hard_failures: []
+  heuristic_raw_score: 100
+  heuristic_final_score: 100
+  raw_score: 100
+  final_score: 100
+  rating: Excellent
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The result matched the expected view, core fields, and baseline rubric checks.
+  - 'Judge rationale: The result correctly provides the average selling price for
+    every brand, matching the requested dimensions, metrics, and grain structure.'
+  improvement_actions:
+  - 'Optional: add a judge-model pass for softer communication and analytical scoring.'
+  - None needed.
+- id: EC-16
+  title: Product Sales Trend
+  question: How do product sales trend by month?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 3
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 1
+    analytical_quality: 2
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 2
+    communication_quality: 3
+    rationale: The result failed to aggregate sales to the monthly grain as required
+      by the question and evaluation checks. It presents daily-level data instead
+      of month-level trends.
+    improvement_actions:
+    - Ensure the final result is grouped by month using `date_trunc('month', order_date)`
+      as the dimension to answer the trend question correctly.
+    - Review the SQL generation to enforce month-level aggregation for the requested
+      'How do product sales trend by month?' question.
+  judge_error: null
+  hard_failures:
+  - missing_requested_time_grain
+  - missing_required_dimension
+  heuristic_raw_score: 40
+  heuristic_final_score: 29
+  raw_score: 36
+  final_score: 29
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: false
+    month_grain_present: false
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The semantic request omitted at least one required dimension from the eval spec.
+  - The result used raw dates instead of the requested month grain.
+  - 'Judge rationale: The result failed to aggregate sales to the monthly grain as
+    required by the question and evaluation checks. It presents daily-level data instead
+    of month-level trends.'
+  improvement_actions:
+  - Preserve all explicitly requested dimensions when building semantic requests.
+  - Map month-oriented questions to `date_trunc('month', ...)` in the planner.
+  - Ensure the final result is grouped by month using `date_trunc('month', order_date)`
+    as the dimension to answer the trend question correctly.
+  - Review the SQL generation to enforce month-level aggregation for the requested
+    'How do product sales trend by month?' question.
+- id: EC-17
+  title: Revenue By Payment Method At Item Level
+  question: Which payment methods are associated with the most product revenue?
+  status: ok
+  scores:
+    question_coverage: 1
+    semantic_correctness: 0
+    analytical_quality: 1
+    communication_quality: 2
+    operational_efficiency: 4
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 0
+    analytical_quality: 2
+    communication_quality: 2
+    operational_efficiency: 4
+  judge_scores:
+    question_coverage: 2
+    analytical_quality: 1
+    communication_quality: 2
+    rationale: Did not use the correct view (`product_sales_semantic` vs `orders_semantic`)
+      and failed to rank the output as requested by the 'ranking' question type. The
+      metric used (`net_sales` from `total_amount`) doesn't match the required `net_item_sales`
+      constraint.
+    improvement_actions:
+    - Strictly adhere to the required view (`product_sales_semantic`).
+    - Ensure the metric used is `net_item_sales` as per the evaluation case.
+    - Since the question explicitly asks for ranking, the final output/summary must
+      include an `ORDER BY` clause sorted by the metric (descending).
+  judge_error: null
+  hard_failures:
+  - missing_or_substituted_metric
+  - summary_table_mismatch
+  - wrong_semantic_view
+  heuristic_raw_score: 26
+  heuristic_final_score: 26
+  raw_score: 22
+  final_score: 22
+  rating: Failing
+  checks:
+    status_ok: true
+    view_match: false
+    all_required_metrics_present: false
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: true
+  rationale:
+  - Expected `product_sales_semantic` but the planner chose `orders_semantic`.
+  - The semantic request did not include all required metrics from the eval spec.
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - The summary text appears inconsistent with the returned table or requested fields.
+  - 'Judge rationale: Did not use the correct view (`product_sales_semantic` vs `orders_semantic`)
+    and failed to rank the output as requested by the ''ranking'' question type. The
+    metric used (`net_sales` from `total_amount`) doesn''t match the required `net_item_sales`
+    constraint.'
+  improvement_actions:
+  - Tighten view-selection guidance for overlapping questions across views.
+  - Prevent metric substitution when the question names a specific business measure.
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Make the summary stage quote the actual returned columns and avoid invented headers.
+  - Strictly adhere to the required view (`product_sales_semantic`).
+  - Ensure the metric used is `net_item_sales` as per the evaluation case.
+  - Since the question explicitly asks for ranking, the final output/summary must
+    include an `ORDER BY` clause sorted by the metric (descending).
+- id: EC-18
+  title: Inactive Products With Sales
+  question: Which inactive products still appear in recent sales?
+  status: ok
+  scores:
+    question_coverage: 3
+    semantic_correctness: 2
+    analytical_quality: 3
+    communication_quality: 5
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 3
+    semantic_correctness: 2
+    analytical_quality: 4
+    communication_quality: 5
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 3
+    analytical_quality: 3
+    communication_quality: 5
+    rationale: The query correctly identifies inactive products appearing in sales,
+      but it used 'line_count' (a proxy for units sold) instead of the fully specified
+      'net_item_sales' metric. It also misses providing context on the sales quantity
+      metric.
+    improvement_actions:
+    - Use 'net_item_sales' as the primary metric instead of 'line_count' to adhere
+      to the expected metrics.
+  judge_error: null
+  hard_failures:
+  - missing_or_substituted_metric
+  heuristic_raw_score: 66
+  heuristic_final_score: 49
+  raw_score: 62
+  final_score: 49
+  rating: Weak
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: false
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: true
+    summary_mismatch: false
+  rationale:
+  - The semantic request did not include all required metrics from the eval spec.
+  - 'Judge rationale: The query correctly identifies inactive products appearing in
+    sales, but it used ''line_count'' (a proxy for units sold) instead of the fully
+    specified ''net_item_sales'' metric. It also misses providing context on the sales
+    quantity metric.'
+  improvement_actions:
+  - Prevent metric substitution when the question names a specific business measure.
+  - Use 'net_item_sales' as the primary metric instead of 'line_count' to adhere to
+    the expected metrics.
+- id: EC-X1
+  title: Product Sales By Customer Segment
+  question: Which customer segments buy the most from each product category?
+  status: error
+  scores:
+    question_coverage: 1
+    semantic_correctness: 2
+    analytical_quality: 0
+    communication_quality: 1
+    operational_efficiency: 1
+  heuristic_scores:
+    question_coverage: 1
+    semantic_correctness: 2
+    analytical_quality: 0
+    communication_quality: 1
+    operational_efficiency: 1
+  judge_scores:
+    question_coverage: 1
+    analytical_quality: 0
+    communication_quality: 1
+    rationale: The result failed entirely with a runtime error instead of providing
+      a helpful explanation for the unsupported question. It did not cover the question's
+      intent.
+    improvement_actions:
+    - Instead of failing with a technical error, the response must clearly state that
+      joining customer segments and product categories is unsupported in a single
+      view, as indicated by the 'question_type' and 'checks'.
+    - The expected behavior requires stating the limitation clearly and suggesting
+      the creation of a new semantic view or join path.
+  judge_error: null
+  hard_failures:
+  - unsupported_handling_runtime_error
+  heuristic_raw_score: 22
+  heuristic_final_score: 22
+  raw_score: 22
+  final_score: 22
+  rating: Failing
+  checks: {}
+  rationale:
+  - The workflow did not answer the unsupported question, but it failed with a runtime-style
+    error instead of a clean refusal.
+  - 'Judge rationale: The result failed entirely with a runtime error instead of providing
+    a helpful explanation for the unsupported question. It did not cover the question''s
+    intent.'
+  improvement_actions:
+  - Add explicit unsupported-question detection in the planner and return a schema-limitation
+    message.
+  - Instead of failing with a technical error, the response must clearly state that
+    joining customer segments and product categories is unsupported in a single view,
+    as indicated by the 'question_type' and 'checks'.
+  - The expected behavior requires stating the limitation clearly and suggesting the
+    creation of a new semantic view or join path.
+- id: EC-X2
+  title: Marketing Attribution
+  question: Which marketing campaigns drive the most net sales?
+  status: ok
+  scores:
+    question_coverage: 0
+    semantic_correctness: 0
+    analytical_quality: 1
+    communication_quality: 2
+    operational_efficiency: 2
+  heuristic_scores:
+    question_coverage: 0
+    semantic_correctness: 0
+    analytical_quality: 1
+    communication_quality: 2
+    operational_efficiency: 2
+  judge_scores:
+    question_coverage: 0
+    analytical_quality: 1
+    communication_quality: 2
+    rationale: The question asks about 'marketing campaigns', but the result shows
+      net sales by 'sales_channel', which is an unsupported substitution, failing
+      to address the core question.
+    improvement_actions:
+    - Since 'marketing campaigns' is not available, the model must explicitly state
+      that the question cannot be answered due to missing dimensions, adhering to
+      the 'unsupported' failure mode.
+  judge_error: null
+  hard_failures:
+  - unsupported_question_answered
+  heuristic_raw_score: 12
+  heuristic_final_score: 12
+  raw_score: 12
+  final_score: 12
+  rating: Failing
+  checks: {}
+  rationale:
+  - The workflow answered an unsupported question with a substituted semantic request
+    instead of refusing it.
+  - 'Judge rationale: The question asks about ''marketing campaigns'', but the result
+    shows net sales by ''sales_channel'', which is an unsupported substitution, failing
+    to address the core question.'
+  improvement_actions:
+  - Block nearest-neighbor substitutions for unsupported questions and return an explicit
+    schema limitation.
+  - Since 'marketing campaigns' is not available, the model must explicitly state
+    that the question cannot be answered due to missing dimensions, adhering to the
+    'unsupported' failure mode.

@@ -1,6 +1,6 @@
 version: 1
 dataset: ecommerce
-generated_at: '2026-04-09T01:03:32.874406+00:00'
+generated_at: '2026-04-09T01:16:03.066635+00:00'
 source_eval_set: /Users/joshuacarlson/repos/semduck/examples/ecommerce/eval/eval_set.yaml
 source_ask_results: examples/ecommerce/eval/results/ask_results_202604081939.yaml
 judge:
@@ -10,9 +10,9 @@ judge:
   model: gemma4:e4b
 summary:
   case_count: 1
-  average_final_score: 90.0
+  average_final_score: 86.0
   rating_counts:
-    Excellent: 1
+    Good: 1
   hard_failure_counts: {}
 cases:
 - id: EC-02
@@ -22,7 +22,7 @@ cases:
   scores:
     question_coverage: 5
     semantic_correctness: 5
-    analytical_quality: 3
+    analytical_quality: 2
     communication_quality: 4
     operational_efficiency: 5
   heuristic_scores:
@@ -33,24 +33,23 @@ cases:
     operational_efficiency: 5
   judge_scores:
     question_coverage: 5
-    analytical_quality: 3
+    analytical_quality: 2
     communication_quality: 4
-    rationale: The result correctly identifies and retrieves the required dimensions
-      (sales_channel) and metrics (net_sales) to answer the question. However, since
-      the question type is 'ranking', and the underlying SQL lacks an ORDER BY clause,
-      the result is not actually ranked by net_sales descending, which is a major
-      analytical failure for this question type.
+    rationale: 'The result correctly identifies the required dimensions and metrics
+      to answer the question (sales_channel vs net_sales). However, the ''checks''
+      failed on `ranking_sorted: false` and the heuristic rationale confirms the missing
+      `ORDER BY` clause, meaning the result is not properly ranked as requested by
+      the question type.'
     improvement_actions:
-    - Modify the SQL query to include an ORDER BY net_sales DESC clause to fulfill
-      the 'ranking' intent of the question.
-    - When the question_type is 'ranking', ensure the final output or SQL explicitly
-      sorts the results by the key metric in descending order.
+    - Add an `ORDER BY net_sales DESC` clause to the generated SQL query to ensure
+      the results are ranked by net sales as requested.
+  judge_error: null
   hard_failures: []
   heuristic_raw_score: 90
   heuristic_final_score: 90
-  raw_score: 90
-  final_score: 90
-  rating: Excellent
+  raw_score: 86
+  final_score: 86
+  rating: Good
   checks:
     status_ok: true
     view_match: true
@@ -63,15 +62,13 @@ cases:
   rationale:
   - The SQL does not include an `order by`, so ranking-style output is not actually
     ranked.
-  - 'Judge rationale: The result correctly identifies and retrieves the required dimensions
-    (sales_channel) and metrics (net_sales) to answer the question. However, since
-    the question type is ''ranking'', and the underlying SQL lacks an ORDER BY clause,
-    the result is not actually ranked by net_sales descending, which is a major analytical
-    failure for this question type.'
+  - 'Judge rationale: The result correctly identifies the required dimensions and
+    metrics to answer the question (sales_channel vs net_sales). However, the ''checks''
+    failed on `ranking_sorted: false` and the heuristic rationale confirms the missing
+    `ORDER BY` clause, meaning the result is not properly ranked as requested by the
+    question type.'
   improvement_actions:
   - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
     target metric.
-  - Modify the SQL query to include an ORDER BY net_sales DESC clause to fulfill the
-    'ranking' intent of the question.
-  - When the question_type is 'ranking', ensure the final output or SQL explicitly
-    sorts the results by the key metric in descending order.
+  - Add an `ORDER BY net_sales DESC` clause to the generated SQL query to ensure the
+    results are ranked by net sales as requested.

@@ -138,14 +138,14 @@ class JudgeResult(BaseModel):
     improvement_actions: list[str] = Field(default_factory=list)
 
 
-def _build_judge_agent(*, config_path: Path, provider: str | None = None, model: str | None = None) -> tuple[Agent[None, JudgeResult], dict[str, str]]:
+def _build_judge_agent(*, config_path: Path, provider: str | None = None, model: str | None = None) -> tuple[Agent[None, str], dict[str, str]]:
     llm_config = load_llm_config(str(config_path))
     resolved = resolve_llm_config(llm_config, provider=provider, model=model)
     registry = create_provider_registry()
     judge_model = registry.build_model(resolved)
     agent = Agent(
         judge_model,
-        output_type=JudgeResult,
+        output_type=str,
         system_prompt=(
             "You are grading semduck ask results against a fixed ecommerce analytics rubric. "
             "Score only these three dimensions on a 0 to 5 scale: question_coverage, analytical_quality, and communication_quality. "
@@ -155,10 +155,42 @@ def _build_judge_agent(*, config_path: Path, provider: str | None = None, model:
             "A result that is not actually ranked when the question asks for ranking should lose analytical quality. "
             "A malformed or misleading summary should lose communication quality. "
             "Return concise rationale and concrete improvement actions. "
-            "Output only structured data."
+            "Return only valid JSON with this exact shape: "
+            "{\"question_coverage\": <0-5 integer>, "
+            "\"analytical_quality\": <0-5 integer>, "
+            "\"communication_quality\": <0-5 integer>, "
+            "\"rationale\": \"<short string>\", "
+            "\"improvement_actions\": [\"<string>\"]}. "
+            "Do not wrap the JSON in markdown fences. "
+            "Do not return any extra text."
         ),
     )
     return agent, {"provider": resolved.provider_name, "model": resolved.model}
+
+
+def _extract_json_object(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if len(lines) >= 3:
+            stripped = "\n".join(lines[1:-1]).strip()
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("Judge response did not contain a JSON object.")
+    return stripped[start : end + 1]
+
+
+def _run_judge(judge_agent: Agent[None, str], judge_prompt: str) -> tuple[JudgeResult | None, dict[str, Any] | None]:
+    try:
+        raw_output = judge_agent.run_sync(judge_prompt).output
+        payload = json.loads(_extract_json_object(raw_output))
+        return JudgeResult.model_validate(payload), None
+    except Exception as exc:
+        return None, {
+            "type": type(exc).__name__,
+            "message": str(exc),
+        }
 
 
 def _weighted_score(scores: dict[str, int]) -> int:
@@ -428,7 +460,7 @@ def _score_case(
     eval_case: dict[str, Any],
     result_case: dict[str, Any],
     *,
-    judge_agent: Agent[None, JudgeResult] | None = None,
+    judge_agent: Agent[None, str] | None = None,
 ) -> dict[str, Any]:
     if not _is_supported(eval_case):
         scores, hard_failures, rationale, improvements = _score_unsupported_case(eval_case, result_case)
@@ -445,6 +477,7 @@ def _score_case(
 
     combined_scores = dict(heuristic_scores)
     judge_output: dict[str, Any] | None = None
+    judge_error: dict[str, Any] | None = None
     if judge_agent is not None:
         judge_prompt = _judge_payload(
             eval_case=eval_case,
@@ -454,12 +487,16 @@ def _score_case(
             checks=checks,
             rationale=rationale,
         )
-        judge_result = judge_agent.run_sync(judge_prompt).output
-        judge_output = judge_result.model_dump()
-        combined_scores = _apply_judge_overlay(heuristic_scores, judge_result)
-        rationale = rationale + [f"Judge rationale: {judge_result.rationale}"]
-        if judge_result.improvement_actions:
-            improvements = improvements + judge_result.improvement_actions
+        judge_result, judge_error = _run_judge(judge_agent, judge_prompt)
+        if judge_result is not None:
+            judge_output = judge_result.model_dump()
+            combined_scores = _apply_judge_overlay(heuristic_scores, judge_result)
+            rationale = rationale + [f"Judge rationale: {judge_result.rationale}"]
+            if judge_result.improvement_actions:
+                improvements = improvements + judge_result.improvement_actions
+        else:
+            rationale = rationale + ["Judge pass failed; final score falls back to heuristic scoring only."]
+            improvements = improvements + ["Fix judge-model JSON output or compatibility with the configured provider."]
 
     raw_score = _weighted_score(combined_scores)
     final_score = _apply_caps(raw_score, hard_failures)
@@ -472,6 +509,7 @@ def _score_case(
         "scores": combined_scores,
         "heuristic_scores": heuristic_scores,
         "judge_scores": judge_output,
+        "judge_error": judge_error,
         "hard_failures": sorted(set(hard_failures)),
         "heuristic_raw_score": heuristic_raw_score,
         "heuristic_final_score": heuristic_final_score,
@@ -557,7 +595,7 @@ def main() -> None:
     ask_results = _load_yaml(args.ask_results)
     eval_cases = _case_lookup(eval_set)
     selected_case_ids = set(args.cases or [])
-    judge_agent: Agent[None, JudgeResult] | None = None
+    judge_agent: Agent[None, str] | None = None
     judge_model_info: dict[str, str] | None = None
     if args.judge:
         judge_agent, judge_model_info = _build_judge_agent(
