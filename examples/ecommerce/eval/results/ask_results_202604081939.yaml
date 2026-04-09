@@ -1,0 +1,1892 @@
+version: 1
+dataset: ecommerce
+generated_at: '2026-04-09T00:33:54.323530+00:00'
+source_eval_set: /Users/joshuacarlson/repos/semduck/examples/ecommerce/eval/eval_set.yaml
+source_db: examples/ecommerce/ecommerce_demo.duckdb
+config: packages/semduck/examples/ask_ollama_config.yaml
+row_limit: 20
+case_count: 20
+cases:
+- id: EC-01
+  title: Monthly Topline Sales
+  supported: true
+  question: What are net sales, order count, and average order value by month?
+  question_type: descriptive_rollup
+  expected:
+    view: orders_semantic
+    grain: month
+    dimensions:
+    - date_trunc('month', order_date) as order_month
+    metrics:
+    - net_sales
+    - order_count
+    - average_order_value
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions order_date metrics net_sales, order_count,
+      average_order_value
+    sql: "select\n  order_date,\n  net_sales,\n  order_count,\n  (net_sales) / (order_count)\
+      \ as average_order_value\nfrom (\n  select\n    order_date,\n    sum(total_amount)\
+      \ as net_sales,\n    count(order_count__input) as order_count\n  from (\n  \
+      \  select\n      o.order_date as order_date,\n      o.total_amount as total_amount,\n\
+      \      o.order_id as order_count__input\n    from orders o\n  ) semduck_base\n\
+      \  group by 1\n) semduck_base;"
+    answer_text: 'The monthly net sales, order count, and average order value are
+      provided in the table below, and the answer is based on truncated results:
+
+      | order_date | net_sales | order_count | average_order_value |
+
+      |---|---|---|---|
+
+      | 2023-01-02 | 906.94 | 1 | 906.94 |
+
+      | 2023-01-06 | 1243.45 | 2 | 621.725 |
+
+      | 2023-01-15 | 479.44 | 1 | 479.44 |
+
+      | 2023-01-27 | 1053.80 | 1 | 1053.8 |
+
+      | 2023-02-08 | 1112.83 | 1 | 1112.83 |
+
+      | 2023-02-14 | 216.37 | 1 | 216.37 |
+
+      | 2023-02-17 | 1249.65 | 1 | 1249.65 |
+
+      | 2023-02-20 | 208.29 | 1 | 208.29 |
+
+      | 2023-02-26 | 826.53 | 1 | 826.53 |
+
+      | 2023-02-28 | 638.04 | 1 | 638.04 |
+
+      | 2023-03-03 | 412.85 | 1 | 412.85 |
+
+      | 2023-03-05 | 1269.88 | 1 | 1269.88 |
+
+      | 2023-03-07 | 778.72 | 1 | 778.72 |
+
+      | 2023-03-15 | 1438.17 | 1 | 1438.17 |
+
+      | 2023-03-18 | 254.19 | 1 | 254.19 |
+
+      | 2023-03-24 | 265.46 | 1 | 265.46 |
+
+      | 2023-03-27 | 901.11 | 1 | 901.11 |
+
+      | 2023-03-28 | 315.52 | 1 | 315.52 |
+
+      | 2023-04-07 | 544.27 | 1 | 544.27 |
+
+      | 2023-04-08 | 339.88 | 1 | 339.88 |'
+    columns:
+    - order_date
+    - net_sales
+    - order_count
+    - average_order_value
+    rows:
+    - - '2023-01-02'
+      - 906.94
+      - 1
+      - 906.94
+    - - '2023-01-06'
+      - 1243.45
+      - 2
+      - 621.725
+    - - '2023-01-15'
+      - 479.44
+      - 1
+      - 479.44
+    - - '2023-01-27'
+      - 1053.8
+      - 1
+      - 1053.8
+    - - '2023-02-08'
+      - 1112.83
+      - 1
+      - 1112.83
+    - - '2023-02-14'
+      - 216.37
+      - 1
+      - 216.37
+    - - '2023-02-17'
+      - 1249.65
+      - 1
+      - 1249.65
+    - - '2023-02-20'
+      - 208.29
+      - 1
+      - 208.29
+    - - '2023-02-26'
+      - 826.53
+      - 1
+      - 826.53
+    - - '2023-02-28'
+      - 638.04
+      - 1
+      - 638.04
+    - - '2023-03-03'
+      - 412.85
+      - 1
+      - 412.85
+    - - '2023-03-05'
+      - 1269.88
+      - 1
+      - 1269.88
+    - - '2023-03-07'
+      - 778.72
+      - 1
+      - 778.72
+    - - '2023-03-15'
+      - 1438.17
+      - 1
+      - 1438.17
+    - - '2023-03-18'
+      - 254.19
+      - 1
+      - 254.19
+    - - '2023-03-24'
+      - 265.46
+      - 1
+      - 265.46
+    - - '2023-03-27'
+      - 901.11
+      - 1
+      - 901.11
+    - - '2023-03-28'
+      - 315.52
+      - 1
+      - 315.52
+    - - '2023-04-07'
+      - 544.27
+      - 1
+      - 544.27
+    - - '2023-04-08'
+      - 339.88
+      - 1
+      - 339.88
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 726
+    omitted_row_count: 706
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-02
+  title: Channel Revenue Mix
+  supported: true
+  question: Which sales channels generate the most net sales?
+  question_type: ranking
+  expected:
+    view: orders_semantic
+    grain: sales_channel
+    dimensions:
+    - sales_channel
+    metrics:
+    - net_sales
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions sales_channel metrics net_sales
+    sql: "select\n  sales_channel,\n  sum(total_amount) as net_sales\nfrom (\n  select\n\
+      \    o.sales_channel as sales_channel,\n    o.total_amount as total_amount\n\
+      \  from orders o\n) semduck_base\ngroup by 1;"
+    answer_text: 'The sales channels that generate the most net sales are:
+
+      | sales_channel | net_sales |
+
+      | :--- | :--- |
+
+      | marketplace | 87986.09 |
+
+      | mobile_app | 247041.79 |
+
+      | online | 632134.07 |
+
+      | store | 55000.21 |'
+    columns:
+    - sales_channel
+    - net_sales
+    rows:
+    - - marketplace
+      - 87986.09
+    - - mobile_app
+      - 247041.79
+    - - online
+      - 632134.07
+    - - store
+      - 55000.21
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 4
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-03
+  title: Payment Method Comparison
+  supported: true
+  question: Which payment methods have the highest average order value?
+  question_type: comparative_ranking
+  expected:
+    view: orders_semantic
+    grain: payment_method
+    dimensions:
+    - payment_method
+    metrics:
+    - average_order_value
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions payment_method metrics average_order_value
+    sql: "select\n  payment_method,\n  (net_sales) / (order_count) as average_order_value\n\
+      from (\n  select\n    payment_method,\n    sum(total_amount) as net_sales,\n\
+      \    count(order_count__input) as order_count\n  from (\n    select\n      o.payment_method\
+      \ as payment_method,\n      o.total_amount as total_amount,\n      o.order_id\
+      \ as order_count__input\n    from orders o\n  ) semduck_base\n  group by 1\n\
+      ) semduck_base;"
+    answer_text: '| payment_method | average_order_value |
+
+      | :--- | :--- |
+
+      | apple_pay | 655.24 |
+
+      | credit_card | 701.70 |
+
+      | paypal | 657.58 |
+
+      | bank_transfer | 649.30 |
+
+      | gift_card | 657.43 |'
+    columns:
+    - payment_method
+    - average_order_value
+    rows:
+    - - apple_pay
+      - 655.2439269406393
+    - - credit_card
+      - 701.7030878859857
+    - - paypal
+      - 657.5812890625
+    - - bank_transfer
+      - 649.3033663366336
+    - - gift_card
+      - 657.4303658536586
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 5
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-04
+  title: Discount Trend By Channel
+  supported: true
+  question: How much discount are we giving by channel and by month?
+  question_type: descriptive_comparison
+  expected:
+    view: orders_semantic
+    grain: month_by_sales_channel
+    dimensions:
+    - date_trunc('month', order_date) as order_month
+    - sales_channel
+    metrics:
+    - total_discount
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions sales_channel, order_date metrics
+      total_discount
+    sql: "select\n  sales_channel,\n  order_date,\n  sum(discount_amount) as total_discount\n\
+      from (\n  select\n    o.sales_channel as sales_channel,\n    o.order_date as\
+      \ order_date,\n    o.discount_amount as discount_amount\n  from orders o\n)\
+      \ semduck_base\ngroup by 1, 2;"
+    answer_text: 'The discount given by channel and by month is presented in the following
+      table (based on truncated results):
+
+      | sales_channel | order_date | total_discount |
+
+      |:---|:---|:---|
+
+      | store | 2026-03-20 | 80.00 |
+
+      | online | 2025-08-03 | 72.62 |
+
+      | online | 2025-08-15 | 330.78 |
+
+      | online | 2023-02-14 | 12.11 |
+
+      | mobile_app | 2024-11-26 | 6.75 |
+
+      | online | 2023-01-02 | 0.00 |
+
+      | online | 2025-08-22 | 36.97 |
+
+      | online | 2025-04-04 | 62.84 |
+
+      | mobile_app | 2025-10-23 | 16.24 |
+
+      | mobile_app | 2026-01-28 | 51.10 |
+
+      | online | 2026-01-13 | 132.04 |
+
+      | mobile_app | 2024-02-20 | 152.41 |
+
+      | marketplace | 2025-07-10 | 11.36 |
+
+      | online | 2025-03-30 | 79.79 |
+
+      | online | 2026-01-17 | 68.90 |
+
+      | online | 2023-04-30 | 0.00 |
+
+      | online | 2025-01-13 | 34.43 |
+
+      | online | 2023-09-19 | 0.00 |
+
+      | mobile_app | 2024-12-02 | 37.74 |
+
+      | marketplace | 2025-07-30 | 54.60 |'
+    columns:
+    - sales_channel
+    - order_date
+    - total_discount
+    rows:
+    - - store
+      - '2026-03-20'
+      - 80.0
+    - - online
+      - '2025-08-03'
+      - 72.62
+    - - online
+      - '2025-08-15'
+      - 330.78
+    - - online
+      - '2023-02-14'
+      - 12.11
+    - - mobile_app
+      - '2024-11-26'
+      - 6.75
+    - - online
+      - '2023-01-02'
+      - 0.0
+    - - online
+      - '2025-08-22'
+      - 36.97
+    - - online
+      - '2025-04-04'
+      - 62.84
+    - - mobile_app
+      - '2025-10-23'
+      - 16.24
+    - - mobile_app
+      - '2026-01-28'
+      - 51.1
+    - - online
+      - '2026-01-13'
+      - 132.04
+    - - mobile_app
+      - '2024-02-20'
+      - 152.41
+    - - marketplace
+      - '2025-07-10'
+      - 11.36
+    - - online
+      - '2025-03-30'
+      - 79.79
+    - - online
+      - '2026-01-17'
+      - 68.9
+    - - online
+      - '2023-04-30'
+      - 0.0
+    - - online
+      - '2025-01-13'
+      - 34.43
+    - - online
+      - '2023-09-19'
+      - 0.0
+    - - mobile_app
+      - '2024-12-02'
+      - 37.74
+    - - marketplace
+      - '2025-07-30'
+      - 54.6
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 1061
+    omitted_row_count: 1041
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-05
+  title: Geographic Revenue Ranking
+  supported: true
+  question: Rank customer states by net sales.
+  question_type: ranking
+  expected:
+    view: orders_semantic
+    grain: customer_state
+    dimensions:
+    - customer_state
+    metrics:
+    - net_sales
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions customer_state metrics net_sales
+    sql: "select\n  customer_state,\n  sum(total_amount) as net_sales\nfrom (\n  select\n\
+      \    c.state as customer_state,\n    o.total_amount as total_amount\n  from\
+      \ orders o\n  LEFT JOIN customers c ON o.customer_id = c.customer_id\n) semduck_base\n\
+      group by 1;"
+    answer_text: '| customer_state | net_sales |
+
+      | :--- | :--- |
+
+      | CT | 47720.47 |
+
+      | MA | 30096.19 |
+
+      | GA | 11564.64 |
+
+      | WA | 20779.21 |
+
+      | RI | 18327.48 |
+
+      | VA | 18597.74 |
+
+      | MP | 11062.43 |
+
+      | KS | 22270.49 |
+
+      | NC | 9200.46 |
+
+      | MN | 15348.12 |
+
+      | AS | 2330.11 |
+
+      | ID | 20045.73 |
+
+      | DC | 22104.10 |
+
+      | OH | 13631.46 |
+
+      | CO | 38938.90 |
+
+      | AL | 14456.50 |
+
+      | NY | 29301.70 |
+
+      | NJ | 14983.68 |
+
+      | WY | 1758.38 |
+
+      | DE | 29533.37 |
+
+
+      The answer is based on truncated results, showing the top 19 of 55 states.'
+    columns:
+    - customer_state
+    - net_sales
+    rows:
+    - - CT
+      - 47720.47
+    - - MA
+      - 30096.19
+    - - GA
+      - 11564.64
+    - - WA
+      - 20779.21
+    - - RI
+      - 18327.48
+    - - VA
+      - 18597.74
+    - - MP
+      - 11062.43
+    - - KS
+      - 22270.49
+    - - NC
+      - 9200.46
+    - - MN
+      - 15348.12
+    - - AS
+      - 2330.11
+    - - ID
+      - 20045.73
+    - - DC
+      - 22104.1
+    - - OH
+      - 13631.46
+    - - CO
+      - 38938.9
+    - - AL
+      - 14456.5
+    - - NY
+      - 29301.7
+    - - NJ
+      - 14983.68
+    - - WY
+      - 1758.38
+    - - DE
+      - 29533.37
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 55
+    omitted_row_count: 35
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-06
+  title: Shipping And Tax Over Time
+  supported: true
+  question: How much shipping revenue and tax are collected over time?
+  question_type: descriptive_rollup
+  expected:
+    view: orders_semantic
+    grain: month
+    dimensions:
+    - date_trunc('month', order_date) as order_month
+    metrics:
+    - total_shipping
+    - total_tax
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions order_date metrics total_shipping,
+      total_tax
+    sql: "select\n  order_date,\n  sum(shipping_amount) as total_shipping,\n  sum(tax_amount)\
+      \ as total_tax\nfrom (\n  select\n    o.order_date as order_date,\n    o.shipping_amount\
+      \ as shipping_amount,\n    o.tax_amount as tax_amount\n  from orders o\n) semduck_base\n\
+      group by 1;"
+    answer_text: 'The shipping revenue and tax collected over time are as follows:
+
+
+      | order_date | total_shipping | total_tax |
+
+      | :--- | :--- | :--- |
+
+      | 2023-01-02 | 0.00 | 70.93 |
+
+      | 2023-01-06 | 0.00 | 95.89 |
+
+      | 2023-01-15 | 0.00 | 41.15 |
+
+      | 2023-01-27 | 0.00 | 57.60 |
+
+      | 2023-02-08 | 0.00 | 63.33 |
+
+      | 2023-02-14 | 0.00 | 16.88 |
+
+      | 2023-02-17 | 0.00 | 63.27 |
+
+      | 2023-02-20 | 0.00 | 16.74 |
+
+      | 2023-02-26 | 0.00 | 69.96 |
+
+      | 2023-02-28 | 0.00 | 32.92 |
+
+      | 2023-03-03 | 0.00 | 32.22 |
+
+      | 2023-03-05 | 0.00 | 98.48 |
+
+      | 2023-03-07 | 0.00 | 55.64 |
+
+      | 2023-03-15 | 0.00 | 110.54 |
+
+      | 2023-03-18 | 0.00 | 15.89 |
+
+      | 2023-03-24 | 0.00 | 12.80 |
+
+      | 2023-03-27 | 0.00 | 61.57 |
+
+      | 2023-03-28 | 0.00 | 19.43 |
+
+      | 2023-04-07 | 0.00 | 34.05 |
+
+      | 2023-04-08 | 0.00 | 16.86 |
+
+
+      The answer is based on truncated results.'
+    columns:
+    - order_date
+    - total_shipping
+    - total_tax
+    rows:
+    - - '2023-01-02'
+      - 0.0
+      - 70.93
+    - - '2023-01-06'
+      - 0.0
+      - 95.89
+    - - '2023-01-15'
+      - 0.0
+      - 41.15
+    - - '2023-01-27'
+      - 0.0
+      - 57.6
+    - - '2023-02-08'
+      - 0.0
+      - 63.33
+    - - '2023-02-14'
+      - 0.0
+      - 16.88
+    - - '2023-02-17'
+      - 0.0
+      - 63.27
+    - - '2023-02-20'
+      - 0.0
+      - 16.74
+    - - '2023-02-26'
+      - 0.0
+      - 69.96
+    - - '2023-02-28'
+      - 0.0
+      - 32.92
+    - - '2023-03-03'
+      - 0.0
+      - 32.22
+    - - '2023-03-05'
+      - 0.0
+      - 98.48
+    - - '2023-03-07'
+      - 0.0
+      - 55.64
+    - - '2023-03-15'
+      - 0.0
+      - 110.54
+    - - '2023-03-18'
+      - 0.0
+      - 15.89
+    - - '2023-03-24'
+      - 0.0
+      - 12.8
+    - - '2023-03-27'
+      - 0.0
+      - 61.57
+    - - '2023-03-28'
+      - 0.0
+      - 19.43
+    - - '2023-04-07'
+      - 0.0
+      - 34.05
+    - - '2023-04-08'
+      - 0.0
+      - 16.86
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 726
+    omitted_row_count: 706
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-07
+  title: Order Status Comparison
+  supported: true
+  question: How do cancelled versus completed orders compare on gross sales and net
+    sales?
+  question_type: comparison
+  expected:
+    view: orders_semantic
+    grain: order_status
+    dimensions:
+    - order_status
+    metrics:
+    - gross_sales
+    - net_sales
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions order_status metrics gross_sales,
+      net_sales
+    sql: "select\n  order_status,\n  sum(subtotal_amount) as gross_sales,\n  sum(total_amount)\
+      \ as net_sales\nfrom (\n  select\n    o.order_status as order_status,\n    o.subtotal_amount\
+      \ as subtotal_amount,\n    o.total_amount as total_amount\n  from orders o\n\
+      ) semduck_base\ngroup by 1;"
+    answer_text: '| order_status | gross_sales | net_sales |
+
+      |---|---|---|
+
+      | completed | 882356.39 | 899423.10 |
+
+      | returned | 64622.56 | 65949.49 |
+
+      | cancelled | 0.00 | 0.00 |
+
+      | pending | 55337.61 | 56789.57 |'
+    columns:
+    - order_status
+    - gross_sales
+    - net_sales
+    rows:
+    - - completed
+      - 882356.39
+      - 899423.1
+    - - returned
+      - 64622.56
+      - 65949.49
+    - - cancelled
+      - 0.0
+      - 0.0
+    - - pending
+      - 55337.61
+      - 56789.57
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 4
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-08
+  title: Customers By Segment
+  supported: true
+  question: How many customers do we have by segment?
+  question_type: descriptive_ranking
+  expected:
+    view: customer_semantic
+    grain: segment
+    dimensions:
+    - segment_name
+    metrics:
+    - customer_count
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: customer_semantic
+    semantic_request: customer_semantic dimensions segment_name metrics customer_count
+    sql: "select\n  segment_name,\n  count(distinct customer_count__input) as customer_count\n\
+      from (\n  select\n    c2.segment_name as segment_name,\n    c.customer_id as\
+      \ customer_count__input\n  from customers c\n  LEFT JOIN customer_segments c2\
+      \ ON c.segment_id = c2.segment_id\n) semduck_base\ngroup by 1;"
+    answer_text: '| segment_name | customer_count |
+
+      | :--- | :--- |
+
+      | Wholesale | 11 |
+
+      | VIP | 35 |
+
+      | New | 47 |
+
+      | Returning | 107 |'
+    columns:
+    - segment_name
+    - customer_count
+    rows:
+    - - Wholesale
+      - 11
+    - - VIP
+      - 35
+    - - New
+      - 47
+    - - Returning
+      - 107
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 4
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-09
+  title: Segment Lifetime Value
+  supported: true
+  question: Which customer segments drive the most lifetime value?
+  question_type: ranking
+  expected:
+    view: customer_semantic
+    grain: segment
+    dimensions:
+    - segment_name
+    metrics:
+    - lifetime_value
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: error
+  error:
+    type: AskExecutionError
+    code: join
+    message: No direct join found between orders and customer_segments
+    failure_stage: ask_plan
+    troubleshooting:
+    - Check the configured provider, model, and semantic view inputs.
+    - Use --sql to inspect the generated semantic request and compiled SQL without
+      executing the query.
+- id: EC-10
+  title: Signup Cohort Growth
+  supported: true
+  question: How many customers signed up each month?
+  question_type: descriptive_rollup
+  expected:
+    view: customer_semantic
+    grain: signup_month
+    dimensions:
+    - date_trunc('month', signup_date) as signup_month
+    metrics:
+    - customer_count
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: customer_semantic
+    semantic_request: customer_semantic dimensions signup_date metrics customer_count
+    sql: "select\n  signup_date,\n  count(distinct customer_count__input) as customer_count\n\
+      from (\n  select\n    c.signup_date as signup_date,\n    c.customer_id as customer_count__input\n\
+      \  from customers c\n) semduck_base\ngroup by 1;"
+    answer_text: '| signup_date | customer_count |
+
+      | :--- | :--- |
+
+      | 2022-02-25 | 1 |
+
+      | 2022-02-05 | 1 |
+
+      | 2024-07-11 | 1 |
+
+      | 2023-11-20 | 1 |
+
+      | 2025-08-24 | 1 |
+
+      | 2023-05-15 | 2 |
+
+      | 2025-01-16 | 1 |
+
+      | 2025-09-21 | 1 |
+
+      | 2024-10-17 | 1 |
+
+      | 2024-11-04 | 1 |
+
+      | 2022-09-16 | 1 |
+
+      | 2023-04-27 | 1 |
+
+      | 2025-07-29 | 1 |
+
+      | 2025-12-10 | 2 |
+
+      | 2025-07-14 | 1 |
+
+      | 2025-05-03 | 1 |
+
+      | 2025-12-01 | 1 |
+
+      | 2024-06-24 | 1 |
+
+      | 2023-12-22 | 1 |
+
+      | 2024-11-05 | 1 |
+
+
+      The answer is based on truncated results.'
+    columns:
+    - signup_date
+    - customer_count
+    rows:
+    - - '2022-02-25'
+      - 1
+    - - '2022-02-05'
+      - 1
+    - - '2024-07-11'
+      - 1
+    - - '2023-11-20'
+      - 1
+    - - '2025-08-24'
+      - 1
+    - - '2023-05-15'
+      - 2
+    - - '2025-01-16'
+      - 1
+    - - '2025-09-21'
+      - 1
+    - - '2024-10-17'
+      - 1
+    - - '2024-11-04'
+      - 1
+    - - '2022-09-16'
+      - 1
+    - - '2023-04-27'
+      - 1
+    - - '2025-07-29'
+      - 1
+    - - '2025-12-10'
+      - 2
+    - - '2025-07-14'
+      - 1
+    - - '2025-05-03'
+      - 1
+    - - '2025-12-01'
+      - 1
+    - - '2024-06-24'
+      - 1
+    - - '2023-12-22'
+      - 1
+    - - '2024-11-05'
+      - 1
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 184
+    omitted_row_count: 164
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-11
+  title: Lifetime Value By Signup Cohort
+  supported: true
+  question: How does lifetime value vary by signup cohort?
+  question_type: cohort_comparison
+  expected:
+    view: customer_semantic
+    grain: signup_month
+    dimensions:
+    - date_trunc('month', signup_date) as signup_month
+    metrics:
+    - lifetime_value
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: customer_semantic
+    semantic_request: customer_semantic dimensions signup_date metrics lifetime_value
+    sql: "select\n  signup_date,\n  sum(total_amount) as lifetime_value\nfrom (\n\
+      \  select\n    c.signup_date as signup_date,\n    o.total_amount as total_amount\n\
+      \  from orders o\n  LEFT JOIN customers c ON o.customer_id = c.customer_id\n\
+      ) semduck_base\ngroup by 1;"
+    answer_text: 'The lifetime value by signup cohort is as follows, based on truncated
+      results:
+
+
+      | signup_date | lifetime_value |
+
+      |-------------|----------------|
+
+      | 2022-01-01 | 4400.73 |
+
+      | 2022-01-03 | 6630.24 |
+
+      | 2022-01-06 | 5675.80 |
+
+      | 2022-01-12 | 2606.81 |
+
+      | 2022-01-29 | 3307.01 |
+
+      | 2022-02-05 | 7211.75 |
+
+      | 2022-02-25 | 4988.27 |
+
+      | 2022-02-28 | 6975.42 |
+
+      | 2022-03-17 | 3833.52 |
+
+      | 2022-03-24 | 2830.33 |
+
+      | 2022-03-26 | 5028.90 |
+
+      | 2022-04-13 | 4124.30 |
+
+      | 2022-04-16 | 10868.48 |
+
+      | 2022-04-17 | 2695.21 |
+
+      | 2022-05-03 | 11748.52 |
+
+      | 2022-05-12 | 6456.84 |
+
+      | 2022-05-30 | 7028.72 |
+
+      | 2022-06-27 | 9043.51 |
+
+      | 2022-07-06 | 2513.31 |
+
+      | 2022-07-25 | 1687.59 |
+
+
+      This answer is based on truncated results.'
+    columns:
+    - signup_date
+    - lifetime_value
+    rows:
+    - - '2022-01-01'
+      - 4400.73
+    - - '2022-01-03'
+      - 6630.24
+    - - '2022-01-06'
+      - 5675.8
+    - - '2022-01-12'
+      - 2606.81
+    - - '2022-01-29'
+      - 3307.01
+    - - '2022-02-05'
+      - 7211.75
+    - - '2022-02-25'
+      - 4988.27
+    - - '2022-02-28'
+      - 6975.42
+    - - '2022-03-17'
+      - 3833.52
+    - - '2022-03-24'
+      - 2830.33
+    - - '2022-03-26'
+      - 5028.9
+    - - '2022-04-13'
+      - 4124.3
+    - - '2022-04-16'
+      - 10868.48
+    - - '2022-04-17'
+      - 2695.21
+    - - '2022-05-03'
+      - 11748.52
+    - - '2022-05-12'
+      - 6456.84
+    - - '2022-05-30'
+      - 7028.72
+    - - '2022-06-27'
+      - 9043.51
+    - - '2022-07-06'
+      - 2513.31
+    - - '2022-07-25'
+      - 1687.59
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 183
+    omitted_row_count: 163
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-12
+  title: Segment And Channel Mix
+  supported: true
+  question: How many orders come from each segment and sales channel combination?
+  question_type: matrix_breakdown
+  expected:
+    view: customer_semantic
+    grain: segment_by_sales_channel
+    dimensions:
+    - segment_name
+    - sales_channel
+    metrics:
+    - order_count
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions sales_channel metrics order_count
+    sql: "select\n  sales_channel,\n  count(order_count__input) as order_count\nfrom\
+      \ (\n  select\n    o.sales_channel as sales_channel,\n    o.order_id as order_count__input\n\
+      \  from orders o\n) semduck_base\ngroup by 1;"
+    answer_text: '| sales_channel | order_count |
+
+      |---|---|
+
+      | marketplace | 131 |
+
+      | online | 936 |
+
+      | store | 79 |
+
+      | mobile_app | 354 |'
+    columns:
+    - sales_channel
+    - order_count
+    rows:
+    - - marketplace
+      - 131
+    - - online
+      - 936
+    - - store
+      - 79
+    - - mobile_app
+      - 354
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 4
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-13
+  title: Product Revenue Leaders
+  supported: true
+  question: Which products generate the most net item sales?
+  question_type: ranking
+  expected:
+    view: product_sales_semantic
+    grain: product
+    dimensions:
+    - product_name
+    metrics:
+    - net_item_sales
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: product_sales_semantic
+    semantic_request: product_sales_semantic dimensions product_name metrics net_item_sales
+    sql: "select\n  product_name,\n  sum(net_item_amount) as net_item_sales\nfrom\
+      \ (\n  select\n    p.product_name as product_name,\n    o.net_item_amount as\
+      \ net_item_amount\n  from order_items o\n  LEFT JOIN products p ON o.product_id\
+      \ = p.product_id\n) semduck_base\ngroup by 1;"
+    answer_text: '| product_name | net_item_sales |
+
+      | :--- | :--- |
+
+      | Lite Tee | 11300.29 |
+
+      | Premium Henley | 8246.23 |
+
+      | Premium Headphones | 24619.03 |
+
+      | Urban Watch Band | 8592.27 |
+
+      | Pro Headset | 13001.75 |
+
+      | Everyday Road Runner | 19594.32 |
+
+      | Essential Belt | 3423.11 |
+
+      | Pro Sling | 19761.86 |
+
+      | Core Boot | 2406.88 |
+
+      | Premium Tee | 2733.83 |
+
+      | Lite Parka | 39159.00 |
+
+      | Summit Court Shoe | 12842.71 |
+
+      | Premium Headset | 17534.67 |
+
+      | Lite Watch Band | 4325.44 |
+
+      | Urban Headphones | 7239.97 |
+
+      | Essential Watch Band | 5300.21 |
+
+      | Trail Crewneck | 16247.38 |
+
+      | Core Speaker | 4770.84 |
+
+      | Core Runner | 17252.08 |
+
+      | Pro Trainer | 37401.46 |
+
+
+      The products that generate the most net item sales are shown in the table above,
+      based on truncated results.'
+    columns:
+    - product_name
+    - net_item_sales
+    rows:
+    - - Lite Tee
+      - 11300.29
+    - - Premium Henley
+      - 8246.23
+    - - Premium Headphones
+      - 24619.03
+    - - Urban Watch Band
+      - 8592.27
+    - - Pro Headset
+      - 13001.75
+    - - Everyday Road Runner
+      - 19594.32
+    - - Essential Belt
+      - 3423.11
+    - - Pro Sling
+      - 19761.86
+    - - Core Boot
+      - 2406.88
+    - - Premium Tee
+      - 2733.83
+    - - Lite Parka
+      - 39159.0
+    - - Summit Court Shoe
+      - 12842.71
+    - - Premium Headset
+      - 17534.67
+    - - Lite Watch Band
+      - 4325.44
+    - - Urban Headphones
+      - 7239.97
+    - - Essential Watch Band
+      - 5300.21
+    - - Trail Crewneck
+      - 16247.38
+    - - Core Speaker
+      - 4770.84
+    - - Core Runner
+      - 17252.08
+    - - Pro Trainer
+      - 37401.46
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 55
+    omitted_row_count: 35
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-14
+  title: Brand And Category Volume
+  supported: true
+  question: Which brands or categories sell the most units?
+  question_type: ranking
+  expected:
+    view: product_sales_semantic
+    grain: brand_or_category
+    dimensions:
+    - brand_name
+    - category_id
+    metrics:
+    - units_sold
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: product_sales_semantic
+    semantic_request: product_sales_semantic dimensions brand_name, category_id metrics
+      units_sold
+    sql: "select\n  brand_name,\n  category_id,\n  sum(quantity) as units_sold\nfrom\
+      \ (\n  select\n    p.brand_name as brand_name,\n    p.category_id as category_id,\n\
+      \    o.quantity as quantity\n  from order_items o\n  LEFT JOIN products p ON\
+      \ o.product_id = p.product_id\n) semduck_base\ngroup by 1, 2;"
+    answer_text: '| brand_name | category_id | units_sold |
+
+      | :--- | :--- | :--- |
+
+      | Oak & Iron | CAT003 | 180 |
+
+      | Blue Harbor | CAT001 | 414 |
+
+      | Motion Lab | CAT006 | 181 |
+
+      | BrightWave | CAT004 | 27 |
+
+      | Stridewell | CAT006 | 619 |
+
+      | Trailmark | CAT002 | 1268 |
+
+      | Summit Sole | CAT006 | 300 |
+
+      | Everlane Co | CAT003 | 225 |
+
+      | Fieldcraft | CAT007 | 155 |
+
+      | Drift Supply | CAT005 | 489 |
+
+      | Peak State | CAT001 | 189 |
+
+      | Common Thread | CAT001 | 673 |
+
+      | NovaTech | CAT008 | 476 |
+
+      | Circuit & Co | CAT004 | 496 |
+
+      | Summit Sole | CAT002 | 241 |
+
+      | Stridewell | CAT002 | 542 |
+
+      | Echo Ridge | CAT008 | 154 |
+
+      | NovaTech | CAT004 | 524 |
+
+      | Northline | CAT001 | 398 |
+
+      | Carrywell | CAT003 | 164 |'
+    columns:
+    - brand_name
+    - category_id
+    - units_sold
+    rows:
+    - - Oak & Iron
+      - CAT003
+      - 180
+    - - Blue Harbor
+      - CAT001
+      - 414
+    - - Motion Lab
+      - CAT006
+      - 181
+    - - BrightWave
+      - CAT004
+      - 27
+    - - Stridewell
+      - CAT006
+      - 619
+    - - Trailmark
+      - CAT002
+      - 1268
+    - - Summit Sole
+      - CAT006
+      - 300
+    - - Everlane Co
+      - CAT003
+      - 225
+    - - Fieldcraft
+      - CAT007
+      - 155
+    - - Drift Supply
+      - CAT005
+      - 489
+    - - Peak State
+      - CAT001
+      - 189
+    - - Common Thread
+      - CAT001
+      - 673
+    - - NovaTech
+      - CAT008
+      - 476
+    - - Circuit & Co
+      - CAT004
+      - 496
+    - - Summit Sole
+      - CAT002
+      - 241
+    - - Stridewell
+      - CAT002
+      - 542
+    - - Echo Ridge
+      - CAT008
+      - 154
+    - - NovaTech
+      - CAT004
+      - 524
+    - - Northline
+      - CAT001
+      - 398
+    - - Carrywell
+      - CAT003
+      - 164
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 27
+    omitted_row_count: 7
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-15
+  title: Average Selling Price By Brand
+  supported: true
+  question: What is average selling price by brand?
+  question_type: comparative_rollup
+  expected:
+    view: product_sales_semantic
+    grain: brand
+    dimensions:
+    - brand_name
+    metrics:
+    - average_selling_price
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: product_sales_semantic
+    semantic_request: product_sales_semantic dimensions brand_name metrics average_selling_price
+    sql: "select\n  brand_name,\n  (net_item_sales) / (units_sold) as average_selling_price\n\
+      from (\n  select\n    brand_name,\n    sum(net_item_amount) as net_item_sales,\n\
+      \    sum(quantity) as units_sold\n  from (\n    select\n      p.brand_name as\
+      \ brand_name,\n      o.net_item_amount as net_item_amount,\n      o.quantity\
+      \ as quantity\n    from order_items o\n    LEFT JOIN products p ON o.product_id\
+      \ = p.product_id\n  ) semduck_base\n  group by 1\n) semduck_base;"
+    answer_text: '| brand_name | average_selling_price |
+
+      |:---|:---:|
+
+      | Fieldcraft | 57.302333010648596 |
+
+      | BrightWave | 81.9126168224299 |
+
+      | Run Harbor | 79.97534746760896 |
+
+      | Motion Lab | 84.02872928176797 |
+
+      | Blue Harbor | 65.05659420289855 |
+
+      | Echo Ridge | 51.81045454545455 |
+
+      | Carrywell | 85.19619205298014 |
+
+      | Summit Sole | 104.0330683918669 |
+
+      | Peak State | 131.96640579710146 |
+
+      | Oak & Iron | 47.734833333333334 |
+
+      | Trailmark | 80.83317034700316 |
+
+      | Northline | 78.84935064935065 |
+
+      | Ridge & Pine | 100.7483 |
+
+      | Circuit & Co | 103.73429435483871 |
+
+      | Stridewell | 103.84952627045651 |
+
+      | Everlane Co | 15.213822222222223 |
+
+      | Common Thread | 45.35882615156018 |
+
+      | Drift Supply | 186.01456032719835 |
+
+      | NovaTech | 121.99172 |'
+    columns:
+    - brand_name
+    - average_selling_price
+    rows:
+    - - Fieldcraft
+      - 57.302333010648596
+    - - BrightWave
+      - 81.9126168224299
+    - - Run Harbor
+      - 79.97534746760896
+    - - Motion Lab
+      - 84.02872928176797
+    - - Blue Harbor
+      - 65.05659420289855
+    - - Echo Ridge
+      - 51.81045454545455
+    - - Carrywell
+      - 85.19619205298014
+    - - Summit Sole
+      - 104.0330683918669
+    - - Peak State
+      - 131.96640579710146
+    - - Oak & Iron
+      - 47.734833333333334
+    - - Trailmark
+      - 80.83317034700316
+    - - Northline
+      - 78.84935064935065
+    - - Ridge & Pine
+      - 100.7483
+    - - Circuit & Co
+      - 103.73429435483871
+    - - Stridewell
+      - 103.84952627045651
+    - - Everlane Co
+      - 15.213822222222223
+    - - Common Thread
+      - 45.35882615156018
+    - - Drift Supply
+      - 186.01456032719835
+    - - NovaTech
+      - 121.99172
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 19
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-16
+  title: Product Sales Trend
+  supported: true
+  question: How do product sales trend by month?
+  question_type: descriptive_trend
+  expected:
+    view: product_sales_semantic
+    grain: month
+    dimensions:
+    - date_trunc('month', order_date) as order_month
+    metrics:
+    - net_item_sales
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: product_sales_semantic
+    semantic_request: product_sales_semantic dimensions order_date metrics net_item_sales
+    sql: "select\n  order_date,\n  sum(net_item_amount) as net_item_sales\nfrom (\n\
+      \  select\n    o2.order_date as order_date,\n    o.net_item_amount as net_item_amount\n\
+      \  from order_items o\n  LEFT JOIN orders o2 ON o.order_id = o2.order_id\n)\
+      \ semduck_base\ngroup by 1;"
+    answer_text: 'The product sales trend by month is as follows:
+
+      | order_date | net_item_sales |
+
+      |---|---|
+
+      | 2023-01-02 | 836.01 |
+
+      | 2023-01-06 | 1147.56 |
+
+      | 2023-01-15 | 438.29 |
+
+      | 2023-01-27 | 996.20 |
+
+      | 2023-02-08 | 1049.50 |
+
+      | 2023-02-14 | 199.49 |
+
+      | 2023-02-17 | 1186.38 |
+
+      | 2023-02-20 | 191.55 |
+
+      | 2023-02-26 | 756.57 |
+
+      | 2023-02-28 | 605.12 |
+
+      | 2023-03-03 | 380.63 |
+
+      | 2023-03-05 | 1171.40 |
+
+      | 2023-03-07 | 723.08 |
+
+      | 2023-03-15 | 1327.63 |
+
+      | 2023-03-18 | 238.30 |
+
+      | 2023-03-24 | 252.66 |
+
+      | 2023-03-27 | 839.54 |
+
+      | 2023-03-28 | 296.09 |
+
+      | 2023-04-07 | 510.22 |
+
+      | 2023-04-08 | 323.02 |
+
+      The answer is based on truncated results.'
+    columns:
+    - order_date
+    - net_item_sales
+    rows:
+    - - '2023-01-02'
+      - 836.01
+    - - '2023-01-06'
+      - 1147.56
+    - - '2023-01-15'
+      - 438.29
+    - - '2023-01-27'
+      - 996.2
+    - - '2023-02-08'
+      - 1049.5
+    - - '2023-02-14'
+      - 199.49
+    - - '2023-02-17'
+      - 1186.38
+    - - '2023-02-20'
+      - 191.55
+    - - '2023-02-26'
+      - 756.57
+    - - '2023-02-28'
+      - 605.12
+    - - '2023-03-03'
+      - 380.63
+    - - '2023-03-05'
+      - 1171.4
+    - - '2023-03-07'
+      - 723.08
+    - - '2023-03-15'
+      - 1327.63
+    - - '2023-03-18'
+      - 238.3
+    - - '2023-03-24'
+      - 252.66
+    - - '2023-03-27'
+      - 839.54
+    - - '2023-03-28'
+      - 296.09
+    - - '2023-04-07'
+      - 510.22
+    - - '2023-04-08'
+      - 323.02
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 726
+    omitted_row_count: 706
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-17
+  title: Revenue By Payment Method At Item Level
+  supported: true
+  question: Which payment methods are associated with the most product revenue?
+  question_type: ranking
+  expected:
+    view: product_sales_semantic
+    grain: payment_method
+    dimensions:
+    - payment_method
+    metrics:
+    - net_item_sales
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions payment_method metrics net_sales
+    sql: "select\n  payment_method,\n  sum(total_amount) as net_sales\nfrom (\n  select\n\
+      \    o.payment_method as payment_method,\n    o.total_amount as total_amount\n\
+      \  from orders o\n) semduck_base\ngroup by 1;"
+    answer_text: 'Campaigns | Payment Method | Net Sales
+
+      :--- | :--- | :---
+
+      1 | credit_card | 590834.00'
+    columns:
+    - payment_method
+    - net_sales
+    rows:
+    - - bank_transfer
+      - 65579.64
+    - - gift_card
+      - 53909.29
+    - - apple_pay
+      - 143498.42
+    - - credit_card
+      - 590834.0
+    - - paypal
+      - 168340.81
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 5
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-18
+  title: Inactive Products With Sales
+  supported: true
+  question: Which inactive products still appear in recent sales?
+  question_type: exploratory_exception_finding
+  expected:
+    view: product_sales_semantic
+    grain: product
+    dimensions:
+    - product_name
+    - is_active
+    metrics:
+    - net_item_sales
+    filters:
+    - is_active = false
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: product_sales_semantic
+    semantic_request: product_sales_semantic dimensions product_name metrics line_count
+      where is_active = FALSE
+    sql: "select\n  product_name,\n  count(line_count__input) as line_count\nfrom\
+      \ (\n  select\n    p.product_name as product_name,\n    o.order_item_id as line_count__input\n\
+      \  from order_items o\n  LEFT JOIN products p ON o.product_id = p.product_id\n\
+      \  where (p.is_active) = FALSE\n) semduck_base\ngroup by 1;"
+    answer_text: The inactive products that still appear in recent sales are Premium
+      Court Shoe (11), Premium Tee (23), Summit Mouse (12), and Core Boot (15).
+    columns:
+    - product_name
+    - line_count
+    rows:
+    - - Premium Court Shoe
+      - 11
+    - - Premium Tee
+      - 23
+    - - Summit Mouse
+      - 12
+    - - Core Boot
+      - 15
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 4
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary
+- id: EC-X1
+  title: Product Sales By Customer Segment
+  supported: false
+  question: Which customer segments buy the most from each product category?
+  question_type: unsupported_cross_view
+  expected:
+    view: null
+    grain: null
+    dimensions: []
+    metrics: []
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: error
+  error:
+    type: AskExecutionError
+    code: runtime
+    message: 'status_code: 400, model_name: gemma4:e4b, body: {''message'': ''invalid
+      message content type: <nil>'', ''type'': ''invalid_request_error'', ''param'':
+      None, ''code'': None}'
+    failure_stage: ask_plan
+    troubleshooting:
+    - Check the configured provider, model, and semantic view inputs.
+    - Use --sql to inspect the generated semantic request and compiled SQL without
+      executing the query.
+- id: EC-X2
+  title: Marketing Attribution
+  supported: false
+  question: Which marketing campaigns drive the most net sales?
+  question_type: unsupported_missing_dimension
+  expected:
+    view: null
+    grain: null
+    dimensions: []
+    metrics: []
+    filters: []
+  run:
+    requested_view: null
+    row_limit: 20
+  status: ok
+  observed:
+    chosen_view: orders_semantic
+    semantic_request: orders_semantic dimensions sales_channel metrics net_sales
+    sql: "select\n  sales_channel,\n  sum(total_amount) as net_sales\nfrom (\n  select\n\
+      \    o.sales_channel as sales_channel,\n    o.total_amount as total_amount\n\
+      \  from orders o\n) semduck_base\ngroup by 1;"
+    answer_text: '| sales_channel | net_sales |
+
+      | :--- | :--- |
+
+      | mobile_app | 247041.79 |
+
+      | marketplace | 87986.09 |
+
+      | online | 632134.07 |
+
+      | store | 55000.21 |'
+    columns:
+    - sales_channel
+    - net_sales
+    rows:
+    - - mobile_app
+      - 247041.79
+    - - marketplace
+      - 87986.09
+    - - online
+      - 632134.07
+    - - store
+      - 55000.21
+    executed: true
+    provider: ollama
+    model: gemma4:e4b
+    summary_provider: ollama
+    summary_model: gemma4:e4b
+    total_row_count: 4
+    omitted_row_count: 0
+    requested_outputs:
+    - sql
+    - table
+    - summary

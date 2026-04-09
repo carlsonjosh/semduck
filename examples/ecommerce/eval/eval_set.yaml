@@ -1,0 +1,437 @@
+version: 1
+dataset: ecommerce
+description: Structured evaluation set for the semduck ecommerce example.
+rubric: SCORING_RUBRIC.md
+cases:
+  - id: EC-01
+    title: Monthly Topline Sales
+    supported: true
+    question: What are net sales, order count, and average order value by month?
+    question_type: descriptive_rollup
+    expected_view: orders_semantic
+    expected_grain: month
+    expected_dimensions:
+      - "date_trunc('month', order_date) as order_month"
+    expected_metrics:
+      - net_sales
+      - order_count
+      - average_order_value
+    expected_filters: []
+    good_answer_characteristics:
+      - groups by month
+      - uses net rather than gross sales
+      - presents all three topline metrics together
+      - highlights any trend or seasonality in the summary
+    common_failure_modes:
+      - uses gross_sales instead of net_sales
+      - groups by day instead of month
+      - omits average_order_value
+      - chooses customer_semantic without need
+  - id: EC-02
+    title: Channel Revenue Mix
+    supported: true
+    question: Which sales channels generate the most net sales?
+    question_type: ranking
+    expected_view: orders_semantic
+    expected_grain: sales_channel
+    expected_dimensions:
+      - sales_channel
+    expected_metrics:
+      - net_sales
+    optional_metrics:
+      - order_count
+    expected_filters: []
+    good_answer_characteristics:
+      - ranks channels by net_sales descending
+      - includes share of total or order count when useful
+      - names the top and bottom channels in the summary
+    common_failure_modes:
+      - sorts alphabetically instead of by metric
+      - uses order count as the primary answer to a revenue question
+      - mixes in unnecessary time grain
+  - id: EC-03
+    title: Payment Method Comparison
+    supported: true
+    question: Which payment methods have the highest average order value?
+    question_type: comparative_ranking
+    expected_view: orders_semantic
+    expected_grain: payment_method
+    expected_dimensions:
+      - payment_method
+    expected_metrics:
+      - average_order_value
+    optional_metrics:
+      - order_count
+      - net_sales
+    expected_filters: []
+    good_answer_characteristics:
+      - ranks by average_order_value
+      - includes order_count so tiny groups are not over-interpreted
+      - avoids overclaiming if counts are close or sparse
+    common_failure_modes:
+      - ranks by net_sales instead of average_order_value
+      - omits denominator context
+      - compares raw totals when the question asks for averages
+  - id: EC-04
+    title: Discount Trend By Channel
+    supported: true
+    question: How much discount are we giving by channel and by month?
+    question_type: descriptive_comparison
+    expected_view: orders_semantic
+    expected_grain: month_by_sales_channel
+    expected_dimensions:
+      - "date_trunc('month', order_date) as order_month"
+      - sales_channel
+    expected_metrics:
+      - total_discount
+    expected_filters: []
+    good_answer_characteristics:
+      - uses a two-dimensional breakdown
+      - keeps month as the primary time grain
+      - points out where discounting is concentrated
+    common_failure_modes:
+      - leaves out channel or month
+      - substitutes gross_sales or net_sales
+      - flattens to a single total that hides the comparison
+  - id: EC-05
+    title: Geographic Revenue Ranking
+    supported: true
+    question: Rank customer states by net sales.
+    question_type: ranking
+    expected_view: orders_semantic
+    expected_grain: customer_state
+    expected_dimensions:
+      - customer_state
+    expected_metrics:
+      - net_sales
+    optional_metrics:
+      - order_count
+      - average_order_value
+    expected_filters: []
+    good_answer_characteristics:
+      - ranks states descending by net_sales
+      - handles null or missing geography explicitly if present
+      - identifies top states and any long-tail shape
+    common_failure_modes:
+      - groups by customer_country instead of customer_state
+      - ranks by order_count
+      - returns unordered rows
+  - id: EC-06
+    title: Shipping And Tax Over Time
+    supported: true
+    question: How much shipping revenue and tax are collected over time?
+    question_type: descriptive_rollup
+    expected_view: orders_semantic
+    expected_grain: month
+    expected_dimensions:
+      - "date_trunc('month', order_date) as order_month"
+    expected_metrics:
+      - total_shipping
+      - total_tax
+    expected_filters: []
+    good_answer_characteristics:
+      - returns both measures together at a consistent time grain
+      - compares their trajectories rather than only listing values
+    common_failure_modes:
+      - answers only one metric
+      - uses net sales as a proxy
+      - groups by a non-time dimension
+  - id: EC-07
+    title: Order Status Comparison
+    supported: true
+    question: How do cancelled versus completed orders compare on gross sales and net sales?
+    question_type: comparison
+    expected_view: orders_semantic
+    expected_grain: order_status
+    expected_dimensions:
+      - order_status
+    expected_metrics:
+      - gross_sales
+      - net_sales
+    optional_metrics:
+      - order_count
+    expected_filters: []
+    good_answer_characteristics:
+      - compares the requested statuses directly
+      - shows both gross and net measures
+      - notes if other statuses exist and whether they were excluded
+    common_failure_modes:
+      - uses only one sales metric
+      - fails to constrain or explain included statuses
+      - compares statuses without order counts for context
+  - id: EC-08
+    title: Customers By Segment
+    supported: true
+    question: How many customers do we have by segment?
+    question_type: descriptive_ranking
+    expected_view: customer_semantic
+    expected_grain: segment
+    expected_dimensions:
+      - segment_name
+    optional_dimensions:
+      - segment_type
+    expected_metrics:
+      - customer_count
+    expected_filters: []
+    good_answer_characteristics:
+      - uses customer-centric counting
+      - includes segment labels clearly
+      - identifies the largest segments
+    common_failure_modes:
+      - uses order_count instead of customer_count
+      - chooses orders_semantic
+      - fails to distinguish segment_name from segment_type
+  - id: EC-09
+    title: Segment Lifetime Value
+    supported: true
+    question: Which customer segments drive the most lifetime value?
+    question_type: ranking
+    expected_view: customer_semantic
+    expected_grain: segment
+    expected_dimensions:
+      - segment_name
+    optional_dimensions:
+      - segment_type
+    expected_metrics:
+      - lifetime_value
+    optional_metrics:
+      - customer_count
+      - average_order_value
+    expected_filters: []
+    good_answer_characteristics:
+      - ranks segments by lifetime_value
+      - includes customer count when useful to separate scale from density
+      - distinguishes contribution from efficiency
+    common_failure_modes:
+      - uses average_order_value as the only ranking metric
+      - chooses orders_semantic
+      - over-interprets without customer-count context
+  - id: EC-10
+    title: Signup Cohort Growth
+    supported: true
+    question: How many customers signed up each month?
+    question_type: descriptive_rollup
+    expected_view: customer_semantic
+    expected_grain: signup_month
+    expected_dimensions:
+      - "date_trunc('month', signup_date) as signup_month"
+    expected_metrics:
+      - customer_count
+    expected_filters: []
+    good_answer_characteristics:
+      - uses signup_date rather than order_date
+      - groups at monthly cohort grain
+      - describes growth or contraction over time
+    common_failure_modes:
+      - uses order_date
+      - counts orders instead of customers
+      - returns customer-level detail instead of a cohort rollup
+  - id: EC-11
+    title: Lifetime Value By Signup Cohort
+    supported: true
+    question: How does lifetime value vary by signup cohort?
+    question_type: cohort_comparison
+    expected_view: customer_semantic
+    expected_grain: signup_month
+    expected_dimensions:
+      - "date_trunc('month', signup_date) as signup_month"
+    expected_metrics:
+      - lifetime_value
+    optional_metrics:
+      - customer_count
+      - average_order_value
+    expected_filters: []
+    good_answer_characteristics:
+      - frames cohorts on signup_date
+      - compares cohort total value with customer counts when useful
+      - avoids unsupported causal claims
+    common_failure_modes:
+      - cohorts on order_date
+      - omits the cohort dimension entirely
+      - presents only customer_count
+  - id: EC-12
+    title: Segment And Channel Mix
+    supported: true
+    question: How many orders come from each segment and sales channel combination?
+    question_type: matrix_breakdown
+    expected_view: customer_semantic
+    expected_grain: segment_by_sales_channel
+    expected_dimensions:
+      - segment_name
+      - sales_channel
+    expected_metrics:
+      - order_count
+    expected_filters: []
+    good_answer_characteristics:
+      - uses both requested dimensions together
+      - returns a clear matrix or sorted long table
+      - identifies the strongest combinations
+    common_failure_modes:
+      - omits one dimension
+      - uses customer_count
+      - chooses a product-oriented view
+  - id: EC-13
+    title: Product Revenue Leaders
+    supported: true
+    question: Which products generate the most net item sales?
+    question_type: ranking
+    expected_view: product_sales_semantic
+    expected_grain: product
+    expected_dimensions:
+      - product_name
+    optional_dimensions:
+      - product_id
+    expected_metrics:
+      - net_item_sales
+    optional_metrics:
+      - units_sold
+      - average_selling_price
+    expected_filters: []
+    good_answer_characteristics:
+      - ranks products by net_item_sales
+      - includes units or price as supporting context
+      - identifies top products clearly
+    common_failure_modes:
+      - ranks by units_sold when the question asks for sales
+      - groups only at brand or category level
+      - uses order-level revenue metrics from another view
+  - id: EC-14
+    title: Brand And Category Volume
+    supported: true
+    question: Which brands or categories sell the most units?
+    question_type: ranking
+    expected_view: product_sales_semantic
+    expected_grain: brand_or_category
+    expected_dimensions:
+      - brand_name
+      - category_id
+    expected_metrics:
+      - units_sold
+    expected_filters: []
+    good_answer_characteristics:
+      - uses the requested grouping level
+      - ranks by units_sold
+      - does not imply human-readable category names beyond category_id
+    common_failure_modes:
+      - uses net_item_sales as the primary answer
+      - invents category names not present in the schema
+      - mixes brand and product grain in one unsound result
+  - id: EC-15
+    title: Average Selling Price By Brand
+    supported: true
+    question: What is average selling price by brand?
+    question_type: comparative_rollup
+    expected_view: product_sales_semantic
+    expected_grain: brand
+    expected_dimensions:
+      - brand_name
+    expected_metrics:
+      - average_selling_price
+    optional_metrics:
+      - units_sold
+    expected_filters: []
+    good_answer_characteristics:
+      - uses the predefined average_selling_price metric
+      - includes units_sold when helpful
+      - flags small-sample risk if needed
+    common_failure_modes:
+      - manually divides the wrong fields
+      - ranks by total sales instead of average selling price
+      - omits brand grain
+  - id: EC-16
+    title: Product Sales Trend
+    supported: true
+    question: How do product sales trend by month?
+    question_type: descriptive_trend
+    expected_view: product_sales_semantic
+    expected_grain: month
+    expected_dimensions:
+      - "date_trunc('month', order_date) as order_month"
+    expected_metrics:
+      - net_item_sales
+    optional_metrics:
+      - units_sold
+    expected_filters: []
+    good_answer_characteristics:
+      - uses order_date at monthly grain
+      - tracks item-level sales over time
+      - notes major trend changes or peaks
+    common_failure_modes:
+      - uses launch_date as the main trend axis
+      - uses order-level net sales instead of item-level net_item_sales
+      - omits the time dimension
+  - id: EC-17
+    title: Revenue By Payment Method At Item Level
+    supported: true
+    question: Which payment methods are associated with the most product revenue?
+    question_type: ranking
+    expected_view: product_sales_semantic
+    expected_grain: payment_method
+    expected_dimensions:
+      - payment_method
+    expected_metrics:
+      - net_item_sales
+    optional_metrics:
+      - units_sold
+    expected_filters: []
+    good_answer_characteristics:
+      - uses item-level revenue with an order-context dimension
+      - ranks payment methods by sales
+      - distinguishes revenue from volume if both are shown
+    common_failure_modes:
+      - switches to orders_semantic unnecessarily
+      - uses gross instead of net item sales without explanation
+      - ranks by count of line items only
+  - id: EC-18
+    title: Inactive Products With Sales
+    supported: true
+    question: Which inactive products still appear in recent sales?
+    question_type: exploratory_exception_finding
+    expected_view: product_sales_semantic
+    expected_grain: product
+    expected_dimensions:
+      - product_name
+      - is_active
+    optional_dimensions:
+      - "date_trunc('month', order_date) as order_month"
+    expected_metrics:
+      - net_item_sales
+    optional_metrics:
+      - units_sold
+      - line_count
+    expected_filters:
+      - is_active = false
+    notes:
+      - recent is intentionally ambiguous and should be defined by the answering workflow
+    good_answer_characteristics:
+      - filters to inactive products
+      - uses a recent time window and states it clearly
+      - highlights unusual exceptions rather than dumping rows without framing
+    common_failure_modes:
+      - forgets the inactive filter
+      - does not define recent
+      - uses the active flag without any sales metric
+  - id: EC-X1
+    title: Product Sales By Customer Segment
+    supported: false
+    question: Which customer segments buy the most from each product category?
+    question_type: unsupported_cross_view
+    expected_outcome: unsupported
+    reason_unsupported: no single view exposes product sales and customer segments together
+    high_scoring_behavior:
+      - states the limitation clearly
+      - suggests creating a new semantic view or broader join path
+    common_failure_modes:
+      - fabricates a direct answer as if the schema already supports it
+  - id: EC-X2
+    title: Marketing Attribution
+    supported: false
+    question: Which marketing campaigns drive the most net sales?
+    question_type: unsupported_missing_dimension
+    expected_outcome: unsupported
+    reason_unsupported: no marketing campaign dimension or attribution model exists in the ecommerce schema
+    high_scoring_behavior:
+      - says the question cannot be answered from the current schema
+      - points to the missing model needed when helpful
+    common_failure_modes:
+      - invents campaign fields or makes unsupported claims

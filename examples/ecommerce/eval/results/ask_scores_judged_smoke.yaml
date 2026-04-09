@@ -1,0 +1,77 @@
+version: 1
+dataset: ecommerce
+generated_at: '2026-04-09T01:03:32.874406+00:00'
+source_eval_set: /Users/joshuacarlson/repos/semduck/examples/ecommerce/eval/eval_set.yaml
+source_ask_results: examples/ecommerce/eval/results/ask_results_202604081939.yaml
+judge:
+  enabled: true
+  config: packages/semduck/examples/ask_ollama_config.yaml
+  provider: ollama
+  model: gemma4:e4b
+summary:
+  case_count: 1
+  average_final_score: 90.0
+  rating_counts:
+    Excellent: 1
+  hard_failure_counts: {}
+cases:
+- id: EC-02
+  title: Channel Revenue Mix
+  question: Which sales channels generate the most net sales?
+  status: ok
+  scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  heuristic_scores:
+    question_coverage: 5
+    semantic_correctness: 5
+    analytical_quality: 3
+    communication_quality: 4
+    operational_efficiency: 5
+  judge_scores:
+    question_coverage: 5
+    analytical_quality: 3
+    communication_quality: 4
+    rationale: The result correctly identifies and retrieves the required dimensions
+      (sales_channel) and metrics (net_sales) to answer the question. However, since
+      the question type is 'ranking', and the underlying SQL lacks an ORDER BY clause,
+      the result is not actually ranked by net_sales descending, which is a major
+      analytical failure for this question type.
+    improvement_actions:
+    - Modify the SQL query to include an ORDER BY net_sales DESC clause to fulfill
+      the 'ranking' intent of the question.
+    - When the question_type is 'ranking', ensure the final output or SQL explicitly
+      sorts the results by the key metric in descending order.
+  hard_failures: []
+  heuristic_raw_score: 90
+  heuristic_final_score: 90
+  raw_score: 90
+  final_score: 90
+  rating: Excellent
+  checks:
+    status_ok: true
+    view_match: true
+    all_required_metrics_present: true
+    all_required_dimensions_present: true
+    month_grain_present: true
+    expected_filters_present: true
+    ranking_sorted: false
+    summary_mismatch: false
+  rationale:
+  - The SQL does not include an `order by`, so ranking-style output is not actually
+    ranked.
+  - 'Judge rationale: The result correctly identifies and retrieves the required dimensions
+    (sales_channel) and metrics (net_sales) to answer the question. However, since
+    the question type is ''ranking'', and the underlying SQL lacks an ORDER BY clause,
+    the result is not actually ranked by net_sales descending, which is a major analytical
+    failure for this question type.'
+  improvement_actions:
+  - Add ranking-intent handling so 'top', 'rank', and 'most' questions sort by the
+    target metric.
+  - Modify the SQL query to include an ORDER BY net_sales DESC clause to fulfill the
+    'ranking' intent of the question.
+  - When the question_type is 'ranking', ensure the final output or SQL explicitly
+    sorts the results by the key metric in descending order.
