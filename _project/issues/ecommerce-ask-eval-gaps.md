@@ -17,6 +17,10 @@ The ecommerce ask evaluation shows that the current ask stack can usually produc
 
 These are not all the same class of problem. Some are planner prompt failures, some are request-language/compiler limitations, and some are join-resolution constraints in the semantic planner.
 
+Potential follow-on enhancement:
+
+- add a post-plan question-to-plan validator that deterministically checks whether the generated plan preserved all clearly requested concepts from the question before execution
+
 ## Evidence From The Eval
 
 Captured artifacts:
@@ -48,6 +52,7 @@ This means:
 - ranking cannot be represented cleanly in the request language today
 - multi-hop joins are not supported by the current join resolver
 - overlapping-view failures are really semantic-grain disambiguation failures, not just ecommerce naming problems
+- even when a syntactically valid plan compiles, semduck does not yet have a deterministic guardrail that rejects partial plans which silently drop requested dimensions or metrics
 
 ## Current Workaround
 
@@ -58,3 +63,25 @@ This means:
 ## Why This Matters
 
 Without these changes, ask can appear successful because SQL executes, while still answering the wrong question shape. That is a bad failure mode for analytics workflows because it produces plausible but semantically incorrect output.
+
+## Deferred Enhancement: Post-Plan Validation
+
+Add a schema-aware validation pass between ask planning and execution that compares:
+
+- requested concepts inferred from the user question
+- dimensions, metrics, grain, and ordering present in the generated plan
+
+Desired behavior:
+
+- deterministically reject plans that drop clearly requested concepts like `segment` in `segment by sales channel`
+- force a planner retry with explicit missing-concept feedback when the plan is partial
+- prefer an unsupported response over executing a nearby but incomplete answer
+- detect false-unsupported planner outcomes when a described single semantic view already contains the needed fields
+  Example:
+  `Which payment methods have the highest average order value?` should be recoverable from `orders_semantic` because `payment_method` and `average_order_value` were both present in the described view, even though the planner drifted and returned an unsupported-style failure
+
+Scope notes:
+
+- this should be conservative and deterministic for explicit concepts first
+- it does not need to solve arbitrary natural-language understanding
+- it is intended as a guardrail on top of prompt improvements, not a replacement for them

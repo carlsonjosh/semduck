@@ -7,10 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from semduck.agent.models import ServiceErrorDetail
-from semduck.agent.services import SemduckServiceError
 from semduck.agent import AskExecutionError, AskPlan, ask_question, ask_question_async, format_ask_result_json, format_ask_result_text
-from semduck.agent.ask import AskStageModel
+from semduck.agent.ask import AskAgentRunError, AskAttemptTrace, AskStageModel, _normalize_plan_aliases, _serialize_messages_safe
+from semduck.errors import SemanticRegistryError
 
 
 class FakeAgent:
@@ -39,6 +38,52 @@ class RaisingFakeAgent:
 
     async def run(self, question, *, deps):
         raise self._error
+
+
+def test_serialize_messages_safe_falls_back_on_serialization_error(monkeypatch):
+    class DummyMessage:
+        pass
+
+    monkeypatch.setattr(
+        "semduck.agent.ask.MODEL_MESSAGE_ADAPTER.dump_python",
+        lambda message, mode: (_ for _ in ()).throw(ValueError("boom")),
+    )
+
+    serialized = _serialize_messages_safe([DummyMessage()])
+
+    assert len(serialized) == 1
+    assert serialized[0]["part_kind"] == "serialization_error"
+    assert serialized[0]["error"]["type"] == "ValueError"
+    assert serialized[0]["error"]["message"] == "boom"
+    assert serialized[0]["message_type"] == "DummyMessage"
+
+
+def test_normalize_plan_aliases_strips_known_table_aliases(loaded_conn):
+    normalized = _normalize_plan_aliases(
+        loaded_conn,
+        AskPlan(
+            chosen_view="orders_semantic",
+            dimensions=["date_trunc('month', o.order_date) as order_month"],
+            metrics=["total_shipping", "total_tax"],
+            where_clause="o.order_status = 'completed'",
+            order_by=["order_month asc"],
+        ),
+    )
+
+    assert normalized.dimensions == ["date_trunc('month', order_date) as order_month"]
+    assert normalized.where_clause == "order_status = 'completed'"
+
+
+def test_normalize_plan_aliases_rejects_unknown_qualified_identifiers(loaded_conn):
+    with pytest.raises(ValueError, match="table-qualified identifiers after normalization"):
+        _normalize_plan_aliases(
+            loaded_conn,
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["date_trunc('month', sales.order_date) as order_month"],
+                metrics=["total_shipping"],
+            ),
+        )
 
 
 def fake_stage(stage: str, provider: str = "ollama", model: str = "llama3.1") -> AskStageModel:
@@ -163,12 +208,12 @@ async def test_ask_question_raises_clear_error_in_active_event_loop(loaded_conn,
 
 def test_ask_question_executes_request_only_once(loaded_conn, monkeypatch):
     call_count = 0
-    original_query = __import__("semduck.agent.ask", fromlist=["query_request_service"]).query_request_service
+    original_sql = type(loaded_conn).sql
 
-    def counting_query(conn, args):
+    def counting_sql(conn, query):
         nonlocal call_count
         call_count += 1
-        return original_query(conn, args)
+        return original_sql(conn, query)
 
     monkeypatch.setattr(
         "semduck.agent.ask._resolve_ask_models",
@@ -194,7 +239,7 @@ def test_ask_question_executes_request_only_once(loaded_conn, monkeypatch):
             "Revenue by region is ready."
         ),
     )
-    monkeypatch.setattr("semduck.agent.ask.query_request_service", counting_query)
+    monkeypatch.setattr(type(loaded_conn), "sql", counting_sql)
 
     ask_question(loaded_conn, "Show revenue by region")
 
@@ -347,24 +392,61 @@ def test_ask_question_writes_partial_trace_for_planner_failure(loaded_conn, monk
     assert records[-1]["failure_stage"] == "ask_plan"
 
 
+def test_ask_question_treats_planner_output_validation_failure_after_tool_use_as_unsupported(
+    loaded_conn, monkeypatch
+):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan", "ollama", "planner-model"),
+            fake_stage("ask_summary", "ollama", "summary-model"),
+            None,
+        ),
+    )
+    monkeypatch.setattr("semduck.agent.ask.create_ask_planner", lambda model: object())
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_summary_agent",
+        lambda model: FakeAgent("unused"),
+    )
+
+    async def fake_run_agent(agent, prompt, *, deps, stage_model):
+        raise AskAgentRunError(
+            AskAttemptTrace(
+                stage=stage_model.stage,
+                prompt=prompt,
+                provider=stage_model.provider_name,
+                model=stage_model.model_name,
+                output={"error": {"type": "ValueError", "message": "Exceeded maximum retries (1) for output validation"}},
+                messages=[{"parts": [{"part_kind": "tool-return", "tool_name": "describe_semantic_view"}]}],
+                started_at="2026-04-09T00:00:00+00:00",
+                finished_at="2026-04-09T00:00:01+00:00",
+                duration_ms=1000,
+            ),
+            ValueError("Exceeded maximum retries (1) for output validation"),
+        )
+
+    monkeypatch.setattr("semduck.agent.ask._run_agent", fake_run_agent)
+
+    with pytest.raises(AskExecutionError) as excinfo:
+        ask_question(loaded_conn, "What is total revenue by customer name?")
+
+    assert excinfo.value.code == "unsupported"
+    assert excinfo.value.failure_stage == "ask_plan"
+
+
 def test_ask_question_writes_plan_attempts_for_compile_failure(loaded_conn, monkeypatch, tmp_path):
     call_count = 0
     original_compile = __import__(
         "semduck.agent.ask",
-        fromlist=["compile_request_service"],
-    ).compile_request_service
+        fromlist=["compile_parsed_semantic_request"],
+    ).compile_parsed_semantic_request
 
-    def flaky_compile(conn, args):
+    def flaky_compile(conn, parsed, *, request=None):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return original_compile(conn, args)
-        raise SemduckServiceError(
-            ServiceErrorDetail(
-                code="registry",
-                message="Unknown semantic view: orders ['customer_name'] ['total_revenue']",
-            )
-        )
+            return original_compile(conn, parsed, request=request)
+        raise SemanticRegistryError("Unknown semantic view: orders ['customer_name'] ['total_revenue']")
 
     monkeypatch.setattr(
         "semduck.agent.ask._resolve_ask_models",
@@ -388,7 +470,7 @@ def test_ask_question_writes_plan_attempts_for_compile_failure(loaded_conn, monk
         "semduck.agent.ask.create_ask_summary_agent",
         lambda model: FakeAgent("unused"),
     )
-    monkeypatch.setattr("semduck.agent.ask.compile_request_service", flaky_compile)
+    monkeypatch.setattr("semduck.agent.ask.compile_parsed_semantic_request", flaky_compile)
 
     with pytest.raises(AskExecutionError) as excinfo:
         ask_question(loaded_conn, "What is total revenue by customer name?")
@@ -439,7 +521,7 @@ def test_ask_plan_allows_null_chosen_view_when_request_is_empty():
 
 
 def test_ask_plan_rejects_fields_when_chosen_view_is_null():
-    with pytest.raises(ValueError, match="dimensions and metrics must be empty"):
+    with pytest.raises(ValueError, match="dimensions, metrics, and order_by must be empty"):
         AskPlan(
             chosen_view=None,
             dimensions=["region"],
@@ -480,7 +562,7 @@ def test_ask_question_treats_none_string_where_clause_as_missing(loaded_conn, mo
     assert result.semantic_request == "orders_semantic dimensions region metrics total_revenue"
 
 
-def test_ask_question_raises_registry_error_when_no_semantic_views_are_available(loaded_conn, monkeypatch):
+def test_ask_question_raises_unsupported_error_when_no_semantic_views_are_available(loaded_conn, monkeypatch):
     monkeypatch.setattr(
         "semduck.agent.ask._resolve_ask_models",
         lambda **kwargs: (
@@ -508,9 +590,9 @@ def test_ask_question_raises_registry_error_when_no_semantic_views_are_available
     with pytest.raises(AskExecutionError) as excinfo:
         ask_question(loaded_conn, "What is total revenue?")
 
-    assert excinfo.value.code == "registry"
+    assert excinfo.value.code == "unsupported"
     assert excinfo.value.failure_stage == "ask_plan"
-    assert "No semantic views are available" in excinfo.value.message
+    assert "cannot answer this question" in excinfo.value.message
 
 
 def test_ask_question_wraps_failures_with_troubleshooting(loaded_conn, monkeypatch):
@@ -541,7 +623,7 @@ def test_ask_question_wraps_failures_with_troubleshooting(loaded_conn, monkeypat
     with pytest.raises(AskExecutionError) as excinfo:
         ask_question(loaded_conn, "What is revenue?")
 
-    assert excinfo.value.code == "registry"
+    assert excinfo.value.code == "unsupported"
     assert excinfo.value.troubleshooting
 
 
@@ -611,11 +693,11 @@ def test_ask_question_raises_parse_error_after_sql_retry(loaded_conn, monkeypatc
     with pytest.raises(AskExecutionError) as excinfo:
         ask_question(loaded_conn, "Show revenue by region", include_sql=True)
 
-    assert excinfo.value.code == "parse"
+    assert excinfo.value.code == "unsupported"
     assert excinfo.value.troubleshooting
 
 
-def test_ask_question_retries_when_model_returns_unsupported_clause(loaded_conn, monkeypatch):
+def test_ask_question_compiles_ordering_from_structured_plan(loaded_conn, monkeypatch):
     monkeypatch.setattr(
         "semduck.agent.ask._resolve_ask_models",
         lambda **kwargs: (
@@ -626,17 +708,14 @@ def test_ask_question_retries_when_model_returns_unsupported_clause(loaded_conn,
     )
     monkeypatch.setattr(
         "semduck.agent.ask.create_ask_planner",
-        lambda model: SequencedFakeAgent(
-            [
-                raw_plan(
-                    semantic_request="orders_semantic dimensions region metrics total_revenue order by total_revenue desc",
-                ),
-                AskPlan(
-                    chosen_view="orders_semantic",
-                    dimensions=["region"],
-                    metrics=["total_revenue"],
-                ),
-            ]
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view="orders_semantic",
+                dimensions=["region"],
+                metrics=["total_revenue"],
+                order_by=["total_revenue desc"],
+                limit=1,
+            )
         ),
     )
     monkeypatch.setattr(
@@ -649,9 +728,12 @@ def test_ask_question_retries_when_model_returns_unsupported_clause(loaded_conn,
     result = ask_question(loaded_conn, "Show revenue by region", include_sql=True)
 
     assert result.semantic_request == "orders_semantic dimensions region metrics total_revenue"
+    assert result.order_by == ["total_revenue desc"]
+    assert result.limit == 1
+    assert "order by total_revenue desc" in result.sql.lower()
+    assert "limit 1" in result.sql.lower()
 
-
-def test_ask_question_raises_unsupported_error_after_clause_retry(loaded_conn, monkeypatch):
+def test_ask_question_returns_clean_unsupported_error_for_null_view(loaded_conn, monkeypatch):
     monkeypatch.setattr(
         "semduck.agent.ask._resolve_ask_models",
         lambda **kwargs: (
@@ -662,15 +744,15 @@ def test_ask_question_raises_unsupported_error_after_clause_retry(loaded_conn, m
     )
     monkeypatch.setattr(
         "semduck.agent.ask.create_ask_planner",
-        lambda model: SequencedFakeAgent(
-            [
-                raw_plan(
-                    semantic_request="orders_semantic dimensions region metrics total_revenue order by total_revenue desc",
-                ),
-                raw_plan(
-                    semantic_request="orders_semantic dimensions region metrics total_revenue limit 10",
-                ),
-            ]
+        lambda model: FakeAgent(
+            AskPlan(
+                chosen_view=None,
+                dimensions=[],
+                metrics=[],
+                where_clause=None,
+                order_by=[],
+                limit=None,
+            )
         ),
     )
     monkeypatch.setattr(
@@ -860,10 +942,10 @@ def test_ask_question_enforces_explicit_requested_view(loaded_conn, monkeypatch)
         lambda model: FakeAgent("unused"),
     )
     monkeypatch.setattr(
-        "semduck.agent.ask.compile_request_service",
-        lambda conn, args: SimpleNamespace(
-            request=args.request,
-            semantic_view_ref="customers_semantic",
+        "semduck.agent.ask.compile_parsed_semantic_request",
+        lambda conn, parsed, request=None: SimpleNamespace(
+            request=request or parsed.semantic_view_ref,
+            parsed_request=SimpleNamespace(semantic_view_ref="customers_semantic"),
             sql="select 1",
         ),
     )
@@ -939,10 +1021,19 @@ def test_ask_question_writes_llm_trace_with_non_json_result_values(loaded_conn, 
         lambda model: FakeAgent("unused"),
     )
     monkeypatch.setattr(
-        "semduck.agent.ask.query_request_service",
-        lambda conn, args: SimpleNamespace(
-            columns=["day", "amount"],
-            rows=[[date(2024, 1, 2), Decimal("12.34")]],
+        "semduck.agent.ask.compile_parsed_semantic_request",
+        lambda conn, parsed, request=None: SimpleNamespace(
+            request=request or parsed.semantic_view_ref,
+            parsed_request=SimpleNamespace(semantic_view_ref=parsed.semantic_view_ref),
+            sql="select 1",
+        ),
+    )
+    monkeypatch.setattr(
+        type(loaded_conn),
+        "sql",
+        lambda conn, query: SimpleNamespace(
+            description=[("day",), ("amount",)],
+            fetchall=lambda: [(date(2024, 1, 2), Decimal("12.34"))],
         ),
     )
 

@@ -9,16 +9,18 @@ from semduck.types import (
     NamedDimension,
     NamedMetric,
     ParsedSemanticRequest,
+    RequestedOrderBy,
     RequestedDimension,
     RequestedMetric,
 )
 
-SECTION_KEYWORDS = ("dimensions", "metrics", "where")
-UNSUPPORTED_PATTERNS = (r"\bhaving\b", r"\border\s+by\b", r"\blimit\b")
+SECTION_KEYWORDS = ("dimensions", "metrics", "where", "order_by", "limit")
+UNSUPPORTED_PATTERNS = (r"\bhaving\b",)
 
 
 def normalize_whitespace(value: str) -> str:
-    return " ".join(value.strip().split())
+    normalized = " ".join(value.strip().split())
+    return re.sub(r"\border\s+by\b", "order_by", normalized, flags=re.IGNORECASE)
 
 
 def _check_unsupported(request: str) -> None:
@@ -120,6 +122,23 @@ def _parse_metric_item(item: str) -> RequestedMetric:
     return DerivedMetric(expr=expr, alias=alias)
 
 
+def _parse_order_by_item(item: str) -> RequestedOrderBy:
+    candidate = item.strip()
+    if not candidate:
+        raise SemanticParseError("order_by items must not be empty")
+
+    tokens = candidate.rsplit(" ", 1)
+    direction = None
+    if len(tokens) == 2 and tokens[1].lower() in {"asc", "desc"}:
+        candidate = tokens[0].strip()
+        direction = tokens[1].lower()
+
+    if not candidate:
+        raise SemanticParseError(f"Malformed order_by item: {item}")
+
+    return RequestedOrderBy(name=candidate, descending=direction == "desc")
+
+
 def parse_request(request_str: str) -> ParsedSemanticRequest:
     raw = normalize_whitespace(request_str)
     if not raw:
@@ -142,6 +161,8 @@ def parse_request(request_str: str) -> ParsedSemanticRequest:
     dimensions: list[RequestedDimension] = []
     metrics: list[RequestedMetric] = []
     where_clause = None
+    order_by: list[RequestedOrderBy] = []
+    limit: int | None = None
 
     for index, (keyword, position) in enumerate(ordered):
         start = position + len(f" {keyword} ")
@@ -154,10 +175,18 @@ def parse_request(request_str: str) -> ParsedSemanticRequest:
             metrics = [_parse_metric_item(item) for item in _split_top_level_commas(section_text)]
         elif keyword == "where":
             where_clause = section_text or None
+        elif keyword == "order_by":
+            order_by = [_parse_order_by_item(item) for item in _split_top_level_commas(section_text)]
+        elif keyword == "limit":
+            if not re.fullmatch(r"\d+", section_text):
+                raise SemanticParseError(f"Malformed limit value: {section_text}")
+            limit = int(section_text)
 
     return ParsedSemanticRequest(
         semantic_view_ref=semantic_view_ref,
         dimensions=dimensions,
         metrics=metrics,
         where_clause=where_clause,
+        order_by=order_by,
+        limit=limit,
     )

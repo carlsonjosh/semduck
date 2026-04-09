@@ -33,6 +33,8 @@ uv run --group dev python examples/ecommerce/eval/run_ask_eval.py \
   --output examples/ecommerce/eval/results/ask_results.yaml
 ```
 
+The runner appends a UTC timestamp when it writes the file, so this command produces a file like `ask_results_20260409T021530Z.yaml`.
+
 Useful flags:
 
 - `--case EC-01`: run a single case
@@ -51,6 +53,8 @@ uv run --group dev python examples/ecommerce/eval/score_ask_eval.py \
   --ask-results examples/ecommerce/eval/results/ask_results_202604081939.yaml \
   --output examples/ecommerce/eval/results/ask_scores.yaml
 ```
+
+The scorer also appends a UTC timestamp at write time, for example `ask_scores_20260409T021612Z.yaml`.
 
 The scorer is deterministic. It reads `eval_set.yaml` and an ask-results file, applies baseline rubric checks such as:
 

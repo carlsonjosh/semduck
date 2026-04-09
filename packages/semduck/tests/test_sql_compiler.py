@@ -82,3 +82,15 @@ def test_compile_derived_dimension_outer_select(loaded_conn):
     )
     sql = compile_sql(plan, registry)
     assert "case when region = 'US' then 'domestic' else 'intl' end as market_type" in sql
+
+
+def test_compile_order_by_and_limit_on_outer_query(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    plan = build_query_plan(
+        parse_request("orders_semantic dimensions region metrics total_revenue order_by total_revenue desc limit 2"),
+        registry,
+    )
+    sql = compile_sql(plan, registry)
+    assert "order by total_revenue desc" in sql.lower()
+    assert "limit 2" in sql.lower()
+    assert "group by 1\norder by" not in sql.lower()

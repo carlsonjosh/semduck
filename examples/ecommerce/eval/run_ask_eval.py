@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -30,8 +31,17 @@ def _default_eval_set_path() -> Path:
 
 
 def _default_output_path() -> Path:
-    timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-    return Path(__file__).resolve().parent / "results" / f"ask_results_{timestamp}.yaml"
+    return Path(__file__).resolve().parent / "results" / "ask_results.yaml"
+
+
+def _timestamp_suffix() -> str:
+    return datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _with_timestamp(path: Path) -> Path:
+    if re.search(r"_\d{8}T\d{6}Z$", path.stem):
+        return path
+    return path.with_name(f"{path.stem}_{_timestamp_suffix()}{path.suffix}")
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -257,7 +267,8 @@ def main() -> None:
     if not selected_cases:
         raise SystemExit("No eval cases selected.")
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+    output_path = _with_timestamp(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     if args.llm_log_dir:
         args.llm_log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -289,11 +300,11 @@ def main() -> None:
         "case_count": len(results),
         "cases": _json_safe(results),
     }
-    args.output.write_text(
+    output_path.write_text(
         yaml.safe_dump(output, sort_keys=False, allow_unicode=False),
         encoding="utf-8",
     )
-    print(f"Wrote ask eval results to {args.output}")
+    print(f"Wrote ask eval results to {output_path}")
 
 
 if __name__ == "__main__":

@@ -14,6 +14,10 @@ Harden the ask workflow against the ecommerce eval set by splitting the required
 
 The goal is not just to make more cases execute. The goal is to preserve the requested business semantics in the compiled request.
 
+Deferred enhancement:
+
+- add a deterministic post-plan validator that checks whether the generated plan preserved all clearly requested concepts from the original question before execution
+
 ## Key Changes
 
 ### 1. Planner: Preserve Time Grain Explicitly
@@ -171,6 +175,40 @@ Expected result:
 
 - cases like `EC-17` stop producing malformed summary headers
 
+### 7. Deferred Enhancement: Post-Plan Question Validation
+
+Problem:
+
+- a syntactically valid plan can still answer only part of the question by dropping one requested concept, especially when overlapping views expose only subsets of the requested dimensions
+
+Proposed change:
+
+- add a schema-aware validation step after ask planning and before execution
+- infer a conservative intent sketch from the question using known semantic concepts:
+  - requested dimensions
+  - requested metrics
+  - requested time grain
+  - requested ranking intent
+- compare that intent sketch to the generated plan
+- if the plan omits a clearly requested concept, reject it and retry the planner with explicit feedback about what was dropped
+
+Examples of intended catches:
+
+- `segment and sales channel combination` must preserve both `segment` and `sales_channel`
+- `lifetime value by signup cohort` must preserve both `lifetime_value` and a cohort-grain signup bucket
+- `top states by net sales` must preserve both `customer_state` and ranking intent
+
+Scope notes:
+
+- this should be deterministic and conservative, not a full natural-language understanding system
+- start with exact names and curated aliases from semantic metadata
+- prefer unsupported over partial answers when no single-view plan satisfies the validated concept set
+
+Expected result:
+
+- overlapping-view failures like `EC-12` are more likely to trigger retry or unsupported instead of executing a partial answer
+- ask becomes less likely to silently answer a nearby but incomplete question
+
 ## Implementation Notes
 
 Suggested order:
@@ -180,6 +218,7 @@ Suggested order:
 3. structured `order_by` and `limit` plan fields plus outer-query SQL emission
 4. summary prompt tightening
 5. rerun the ecommerce eval and compare scores
+6. optionally add the deferred post-plan validator if prompt-only improvements still allow partial-answer failures
 
 Recommended acceptance baseline:
 

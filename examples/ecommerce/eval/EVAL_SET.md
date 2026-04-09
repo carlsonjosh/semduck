@@ -331,6 +331,23 @@ For each case:
   - not defining what "recent" means
   - using an active/inactive dimension without any sales metric
 
+### EC-19 Quarterly Sales Rollup
+
+- Question: "What are net sales by quarter?"
+- Expected semantic view: `orders_semantic`
+- Question type: descriptive rollup
+- Expected grain: quarter
+- Expected dimensions: `date_trunc('quarter', order_date) as order_quarter`
+- Expected metrics: `net_sales`
+- Good answer characteristics:
+  - uses quarter grain rather than month or raw date
+  - keeps the answer at order-level net sales
+  - summarizes the quarterly trend clearly
+- Common failure modes:
+  - defaulting to month despite the explicit quarter request
+  - grouping by raw `order_date`
+  - substituting `gross_sales` for `net_sales`
+
 ## Unsupported Or Trick Cases
 
 These are useful negative tests and should score poorly if the system answers them confidently without caveat.

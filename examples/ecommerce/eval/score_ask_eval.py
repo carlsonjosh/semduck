@@ -5,6 +5,7 @@ from collections import Counter
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
@@ -43,37 +44,56 @@ def _default_ask_results_path() -> Path:
 
 
 def _default_output_path() -> Path:
-    timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-    return _default_results_dir() / f"ask_scores_{timestamp}.yaml"
+    return _default_results_dir() / "ask_scores.yaml"
 
 
 def _default_config_path() -> Path:
     return Path(__file__).resolve().parents[3] / "packages" / "semduck" / "examples" / "ask_ollama_config.yaml"
 
 
+def _timestamp_suffix() -> str:
+    return datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _with_timestamp(path: Path) -> Path:
+    if re.search(r"_\d{8}T\d{6}Z$", path.stem):
+        return path
+    return path.with_name(f"{path.stem}_{_timestamp_suffix()}{path.suffix}")
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def _contains_month_grain(text: str) -> bool:
+def _contains_date_trunc_grain(text: str, grain: str) -> bool:
     lowered = text.lower()
-    return "date_trunc('month'" in lowered or 'date_trunc("month"' in lowered
+    return f"date_trunc('{grain}'" in lowered or f'date_trunc("{grain}"' in lowered
 
 
 def _is_supported(case: dict[str, Any]) -> bool:
     return bool(case.get("supported", True))
 
 
-def _question_requires_month_grain(case: dict[str, Any]) -> bool:
-    return str(case.get("expected", {}).get("grain", "")).startswith("month") or "month" in str(
-        case.get("expected", {}).get("grain", "")
-    )
+def _expected_time_grain(case: dict[str, Any]) -> str | None:
+    grain = str(case.get("expected", {}).get("grain", "")).lower()
+    if "quarter" in grain:
+        return "quarter"
+    if "month" in grain:
+        return "month"
+    if "year" in grain:
+        return "year"
+    if "week" in grain:
+        return "week"
+    if "day" in grain:
+        return "day"
+    return None
 
 
 def _normalize_expected_dimension(dimension: str) -> str:
     lowered = dimension.lower().strip()
-    if "date_trunc('month'" in lowered or 'date_trunc("month"' in lowered:
-        return "month_grain"
+    for grain in ("day", "week", "month", "quarter", "year"):
+        if f"date_trunc('{grain}'" in lowered or f'date_trunc("{grain}"' in lowered:
+            return f"{grain}_grain"
     if " as " in lowered:
         return lowered.split(" as ", 1)[-1].strip()
     return lowered
@@ -86,8 +106,8 @@ def _metric_present(metric: str, semantic_request: str) -> bool:
 def _dimension_present(dimension: str, semantic_request: str) -> bool:
     normalized = _normalize_expected_dimension(dimension)
     lowered = semantic_request.lower()
-    if normalized == "month_grain":
-        return _contains_month_grain(semantic_request)
+    if normalized.endswith("_grain"):
+        return _contains_date_trunc_grain(semantic_request, normalized.removesuffix("_grain"))
     return normalized in lowered
 
 
@@ -322,7 +342,10 @@ def _score_supported_ok(case: dict[str, Any], result_case: dict[str, Any]) -> tu
         "all_required_dimensions_present": all(
             _dimension_present(dimension, semantic_request) for dimension in expected_dimensions
         ),
-        "month_grain_present": (not _question_requires_month_grain(result_case)) or _contains_month_grain(semantic_request),
+        "time_grain_present": (
+            _expected_time_grain(result_case) is None
+            or _contains_date_trunc_grain(semantic_request, _expected_time_grain(result_case) or "")
+        ),
         "expected_filters_present": all(filter_value.lower() in semantic_request.lower() for filter_value in expected_filters),
         "ranking_sorted": (not _is_ranking_case(result_case)) or ("order by" in sql.lower()),
         "summary_mismatch": _detect_summary_mismatch(result_case, answer_text, columns),
@@ -354,13 +377,16 @@ def _score_supported_ok(case: dict[str, Any], result_case: dict[str, Any]) -> tu
         rationale.append("The semantic request omitted at least one required dimension from the eval spec.")
         improvements.append("Preserve all explicitly requested dimensions when building semantic requests.")
 
-    if not checks["month_grain_present"]:
+    if not checks["time_grain_present"]:
         coverage -= 2
         correctness -= 2
         analytical -= 2
         hard_failures.append("missing_requested_time_grain")
-        rationale.append("The result used raw dates instead of the requested month grain.")
-        improvements.append("Map month-oriented questions to `date_trunc('month', ...)` in the planner.")
+        expected_grain = _expected_time_grain(result_case) or "requested"
+        rationale.append(f"The result did not use the requested {expected_grain} time grain.")
+        improvements.append(
+            "Map time-oriented questions to the requested `date_trunc(...)` grain in the planner."
+        )
 
     if not checks["all_required_metrics_present"]:
         coverage -= 2
@@ -631,12 +657,13 @@ def main() -> None:
         "cases": scored_cases,
     }
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
+    output_path = _with_timestamp(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
         yaml.safe_dump(output, sort_keys=False, allow_unicode=False),
         encoding="utf-8",
     )
-    print(f"Wrote scored eval results to {args.output}")
+    print(f"Wrote scored eval results to {output_path}")
 
 
 if __name__ == "__main__":

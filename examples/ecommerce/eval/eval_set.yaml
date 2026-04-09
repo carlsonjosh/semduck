@@ -411,6 +411,26 @@ cases:
       - forgets the inactive filter
       - does not define recent
       - uses the active flag without any sales metric
+  - id: EC-19
+    title: Quarterly Sales Rollup
+    supported: true
+    question: What are net sales by quarter?
+    question_type: descriptive_rollup
+    expected_view: orders_semantic
+    expected_grain: quarter
+    expected_dimensions:
+      - "date_trunc('quarter', order_date) as order_quarter"
+    expected_metrics:
+      - net_sales
+    expected_filters: []
+    good_answer_characteristics:
+      - uses quarter grain rather than month or raw date
+      - keeps the answer at order-level net sales
+      - summarizes the quarterly trend clearly
+    common_failure_modes:
+      - defaults to month despite the explicit quarter request
+      - groups by raw order_date
+      - substitutes gross_sales for net_sales
   - id: EC-X1
     title: Product Sales By Customer Segment
     supported: false

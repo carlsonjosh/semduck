@@ -49,7 +49,7 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
         if not select_parts:
             select_parts.append("*")
         sql = "select\n  " + ",\n  ".join(select_parts) + f"\n{raw_sql}"
-        if not plan.derived_dimensions and not plan.derived_metrics:
+        if not plan.derived_dimensions and not plan.derived_metrics and not plan.order_by and plan.limit is None:
             return sql + ";"
     else:
         base_select_parts = []
@@ -79,7 +79,7 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
         sql += "\n) semduck_base"
         if plan.metrics and plan.dimensions:
             sql += f"\ngroup by {', '.join(group_by_positions)}"
-        if not plan.derived_dimensions and not plan.derived_metrics:
+        if not plan.derived_dimensions and not plan.derived_metrics and not plan.order_by and plan.limit is None:
             return sql + ";"
 
     outer_select_parts = []
@@ -100,4 +100,9 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
     outer_sql = "select\n  " + ",\n  ".join(outer_select_parts) + "\nfrom (\n"
     outer_sql += "\n".join(f"  {line}" for line in sql.splitlines())
     outer_sql += "\n) semduck_base"
+    if plan.order_by:
+        order_clauses = [f"{item.name} {'desc' if item.descending else 'asc'}" for item in plan.order_by]
+        outer_sql += "\norder by " + ", ".join(order_clauses)
+    if plan.limit is not None:
+        outer_sql += f"\nlimit {plan.limit}"
     return outer_sql + ";"
