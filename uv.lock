@@ -13,6 +13,7 @@ dev = [
     { name = "faker", specifier = ">=40.12.0" },
     { name = "numpy", specifier = ">=2.4.4" },
     { name = "pytest" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "tox", specifier = ">=4.24" },
 ]
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from semduck.errors import SemanticRegistryError
@@ -20,7 +21,7 @@ def load_semantic_view_registry(conn: Any, semantic_view_ref: str) -> SemanticVi
 
     table_rows = conn.execute(
         """
-        select table_name, physical_schema, physical_table, table_alias
+        select table_name, physical_schema, physical_table, table_alias, primary_key_columns
         from semantic.semantic_view_tables
         where view_name = ?
         order by table_name
@@ -29,7 +30,7 @@ def load_semantic_view_registry(conn: Any, semantic_view_ref: str) -> SemanticVi
     ).fetchall()
 
     tables: dict[str, SemanticTable] = {}
-    for table_name, physical_schema, physical_table, table_alias in table_rows:
+    for table_name, physical_schema, physical_table, table_alias, primary_key_columns in table_rows:
         dim_rows = conn.execute(
             """
             select dimension_name, dimension_kind, expr, data_type
@@ -89,6 +90,7 @@ def load_semantic_view_registry(conn: Any, semantic_view_ref: str) -> SemanticVi
             physical_schema=physical_schema,
             physical_table=physical_table,
             alias=table_alias,
+            primary_key_columns=list(json.loads(primary_key_columns)) if primary_key_columns else [],
             dimensions=dimensions,
             metrics=metrics,
             facts=facts,

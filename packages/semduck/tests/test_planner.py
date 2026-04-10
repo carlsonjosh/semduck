@@ -169,3 +169,100 @@ def test_derived_dimension_fact_reference_with_metrics_rejected(loaded_conn):
         pass
     else:
         raise AssertionError("expected SemanticResolutionError")
+
+
+def test_order_by_must_reference_selected_outputs(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    try:
+        build_query_plan(
+            parse_request("orders_semantic dimensions region metrics total_revenue order_by customer_segment desc"),
+            registry,
+        )
+    except SemanticResolutionError:
+        pass
+    else:
+        raise AssertionError("expected SemanticResolutionError")
+
+
+def test_safe_multihop_join_resolution(conn):
+    conn.execute("insert into semantic.semantic_views (view_name) values ('sample')")
+    conn.execute(
+        """
+        insert into semantic.semantic_view_tables
+        (view_name, table_name, physical_table, table_alias, primary_key_columns)
+        values
+        ('sample', 'orders', 'orders_tbl', 'o', '["order_id"]'),
+        ('sample', 'customers', 'customers_tbl', 'c', '["customer_id"]'),
+        ('sample', 'segments', 'segments_tbl', 's', '["segment_id"]')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.metrics
+        (view_name, table_name, metric_name, metric_type, expr)
+        values ('sample', 'orders', 'm1', 'sum', 'revenue')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.dimensions
+        (view_name, table_name, dimension_name, dimension_kind, expr)
+        values ('sample', 'segments', 'd1', 'dimension', 'segment_name')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.joins
+        (view_name, join_name, left_table, right_table, join_type, join_expr)
+        values
+        ('sample', 'orders_to_customers', 'orders', 'customers', 'left', 'LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id'),
+        ('sample', 'customers_to_segments', 'customers', 'segments', 'left', 'LEFT_TABLE.segment_id = RIGHT_TABLE.segment_id')
+        """
+    )
+    registry = load_semantic_view_registry(conn, "sample")
+    plan = build_query_plan(parse_request("sample dimensions d1 metrics m1"), registry)
+    assert len(plan.joins) == 2
+
+
+def test_unsafe_multihop_join_rejected(conn):
+    conn.execute("insert into semantic.semantic_views (view_name) values ('sample')")
+    conn.execute(
+        """
+        insert into semantic.semantic_view_tables
+        (view_name, table_name, physical_table, table_alias, primary_key_columns)
+        values
+        ('sample', 'orders', 'orders_tbl', 'o', '["order_id"]'),
+        ('sample', 'customers', 'customers_tbl', 'c', '["customer_id"]'),
+        ('sample', 'segments', 'segments_tbl', 's', '["segment_id"]')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.metrics
+        (view_name, table_name, metric_name, metric_type, expr)
+        values ('sample', 'orders', 'm1', 'sum', 'revenue')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.dimensions
+        (view_name, table_name, dimension_name, dimension_kind, expr)
+        values ('sample', 'segments', 'd1', 'dimension', 'segment_name')
+        """
+    )
+    conn.execute(
+        """
+        insert into semantic.joins
+        (view_name, join_name, left_table, right_table, join_type, join_expr)
+        values
+        ('sample', 'orders_to_customers', 'orders', 'customers', 'left', 'LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id'),
+        ('sample', 'customers_to_segments', 'customers', 'segments', 'left', 'LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id')
+        """
+    )
+    registry = load_semantic_view_registry(conn, "sample")
+    try:
+        build_query_plan(parse_request("sample dimensions d1 metrics m1"), registry)
+    except SemanticJoinError as exc:
+        assert "grain-safe" in str(exc)
+    else:
+        raise AssertionError("expected SemanticJoinError")

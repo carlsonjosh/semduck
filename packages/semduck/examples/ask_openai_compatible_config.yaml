@@ -17,6 +17,6 @@ llm:
   providers:
     openai:
       type: openai_compatible
-      model: gpt-5.4
+      model: gpt-5.4-nano
       base_url: https://api.openai.com/v1
       api_key_env: OPENAI_API_KEY
