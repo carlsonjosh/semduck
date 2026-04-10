@@ -84,6 +84,36 @@ def test_compile_derived_dimension_outer_select(loaded_conn):
     assert "case when region = 'US' then 'domestic' else 'intl' end as market_type" in sql
 
 
+def test_compile_derived_time_dimension_groups_by_derived_bucket(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    plan = build_query_plan(
+        parse_request(
+            "orders_semantic dimensions date_trunc('month', order_date) as order_month metrics total_revenue"
+        ),
+        registry,
+    )
+    sql = compile_sql(plan, registry)
+    assert "select\n  order_month,\n  total_revenue" in sql
+    assert "date_trunc('month', order_date) as order_month" in sql
+    assert "order_date,\n      o.revenue as order_revenue" in sql
+    assert "group by 1" in sql
+    assert "date_trunc('month', order_date) as order_month,\n    sum(order_revenue) as total_revenue" in sql
+
+
+def test_compile_derived_dimension_groups_by_derived_value_not_dependency(loaded_conn):
+    registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
+    plan = build_query_plan(
+        parse_request(
+            "orders_semantic dimensions case when region = 'US' then 'domestic' else 'intl' end as market_type metrics total_revenue"
+        ),
+        registry,
+    )
+    sql = compile_sql(plan, registry)
+    assert "case when region = 'US' then 'domestic' else 'intl' end as market_type,\n    sum(order_revenue) as total_revenue" in sql
+    assert "select\n  market_type,\n  total_revenue" in sql
+    assert "group by 1" in sql
+
+
 def test_compile_order_by_and_limit_on_outer_query(loaded_conn):
     registry = load_semantic_view_registry(loaded_conn, "orders_semantic")
     plan = build_query_plan(

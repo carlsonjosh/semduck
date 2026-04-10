@@ -22,6 +22,7 @@ from semduck.agent.services import (
     describe_semantic_view_service,
     list_semantic_views_service,
 )
+from semduck.agent.validation import DEFAULT_VALIDATION_POLICY, PlanValidationResult, ValidationIssue, validate_plan
 from semduck.errors import (
     SemanticCompileError,
     SemanticJoinError,
@@ -141,8 +142,6 @@ class AskPlan(BaseModel):
             return self
         if not self.dimensions and not self.metrics:
             raise ValueError("at least one dimension or metric is required")
-        _validate_semantic_request(_render_semantic_request(self))
-        _build_parsed_request(self)
         return self
 
 
@@ -175,6 +174,7 @@ class AskExecutionError(Exception):
         *,
         failure_stage: str | None = None,
         attempts: list["AskAttemptTrace"] | None = None,
+        validation_issues: list[ValidationIssue] | None = None,
     ):
         super().__init__(message)
         self.code = code
@@ -182,6 +182,7 @@ class AskExecutionError(Exception):
         self.troubleshooting = troubleshooting or []
         self.failure_stage = failure_stage
         self.attempts = attempts or []
+        self.validation_issues = validation_issues or []
 
 
 @dataclass
@@ -590,7 +591,7 @@ async def _ask_with_semantic_retry(
     deps: AskDependencies,
     *,
     progress: AskProgressReporter | None = None,
-) -> tuple[AskPlan, list[AskAttemptTrace]]:
+) -> tuple[AskPlan, list[AskAttemptTrace], PlanValidationResult | None]:
     attempts: list[AskAttemptTrace] = []
     _emit_progress(progress, "planning semantic request")
     try:
@@ -598,7 +599,7 @@ async def _ask_with_semantic_retry(
     except AskAgentRunError as exc:
         attempts.append(exc.attempt)
         if _is_output_validation_failure(exc.cause) and _messages_show_successful_tool_inspection(exc.attempt.messages):
-            return _null_plan(), attempts
+            return _null_plan(), attempts, None
         raise AskExecutionError(
             code="runtime",
             message=str(exc.cause),
@@ -608,25 +609,48 @@ async def _ask_with_semantic_retry(
         ) from exc.cause
     attempts.append(initial_attempt)
     if _is_empty_plan(plan):
-        return plan, attempts
-    retry_error: ValueError | SemanticViewError | None = None
-    try:
-        rendered_request = _render_semantic_request(plan)
-        _validate_semantic_request(rendered_request)
-        plan = _normalize_plan_aliases(deps.conn, plan)
-        _validate_compilable_request(deps.conn, plan)
-        return plan, attempts
-    except (ValueError, SemanticViewError) as exc:
-        retry_error = exc
+        validation = validate_plan(
+            question,
+            plan,
+            deps.conn,
+            policy=DEFAULT_VALIDATION_POLICY,
+        )
+        if validation.action in {"accept", "accept_with_warnings"}:
+            return plan, attempts, validation
+        if validation.action == "reject_as_unsupported":
+            return plan, attempts, validation
+    else:
+        try:
+            plan = _normalize_plan_aliases(deps.conn, plan)
+        except (ValueError, SemanticViewError):
+            pass
+        validation = validate_plan(
+            question,
+            plan,
+            deps.conn,
+            policy=DEFAULT_VALIDATION_POLICY,
+        )
+        if validation.action in {"accept", "accept_with_warnings"}:
+            return validation.normalized_plan or plan, attempts, validation
+        if validation.action == "reject_as_unsupported":
+            return _null_plan(), attempts, validation
 
-    _emit_progress(progress, "retrying planner after invalid request")
+    if validation is None:
+        validation = validate_plan(
+            question,
+            plan,
+            deps.conn,
+            policy=DEFAULT_VALIDATION_POLICY,
+        )
+
+    _emit_progress(progress, "retrying planner after validator rejection")
     retry_prompt = (
         f"{question}\n\n"
         "Fix the previous structured request.\n"
         f"Previous plan: chosen_view={plan.chosen_view!r}, dimensions={plan.dimensions!r}, "
         f"metrics={plan.metrics!r}, where_clause={plan.where_clause!r}, "
         f"order_by={plan.order_by!r}, limit={plan.limit!r}\n"
-        f"{_build_retry_error_guidance(retry_error) if retry_error is not None else ''}\n\n"
+        f"{chr(10).join(validation.retry_feedback)}\n\n"
         "Preserve the valid parts of the previous plan and fix only the invalid field.\n"
         "If you cannot correct it without guessing, return the null plan.\n"
         "Return only one structured object with exactly these fields: chosen_view, dimensions, metrics, where_clause, order_by, limit.\n"
@@ -637,21 +661,30 @@ async def _ask_with_semantic_retry(
     except AskAgentRunError as exc:
         exc.attempt.is_retry = True
         attempts.append(exc.attempt)
-        return _null_plan(), attempts
+        return _null_plan(), attempts, validation
     retry_attempt.is_retry = True
     attempts.append(retry_attempt)
     if _is_empty_plan(retry_plan):
-        return retry_plan, attempts
+        retry_validation = validate_plan(
+            question,
+            retry_plan,
+            deps.conn,
+            policy=DEFAULT_VALIDATION_POLICY,
+        )
+        return retry_plan, attempts, retry_validation
     try:
-        retry_request = _render_semantic_request(retry_plan)
-        _validate_semantic_request(retry_request)
         retry_plan = _normalize_plan_aliases(deps.conn, retry_plan)
-        _validate_compilable_request(deps.conn, retry_plan)
-    except ValueError as exc:
-        return _null_plan(), attempts
-    except SemanticViewError as exc:
-        return _null_plan(), attempts
-    return retry_plan, attempts
+    except (ValueError, SemanticViewError):
+        pass
+    retry_validation = validate_plan(
+        question,
+        retry_plan,
+        deps.conn,
+        policy=DEFAULT_VALIDATION_POLICY,
+    )
+    if retry_validation.action in {"accept", "accept_with_warnings"}:
+        return retry_validation.normalized_plan or retry_plan, attempts, retry_validation
+    return _null_plan(), attempts, retry_validation
 
 
 def _build_summary_prompt(
@@ -742,6 +775,8 @@ def _write_llm_trace(
     attempts: list[AskAttemptTrace],
     result: AskResult | None = None,
     failure: AskExecutionError | None = None,
+    validation: PlanValidationResult | None = None,
+    validation_timestamp: str | None = None,
 ) -> None:
     if log_dir is None:
         return
@@ -757,7 +792,51 @@ def _write_llm_trace(
     }
 
     with trace_path.open("a", encoding="utf-8") as handle:
-        for index, attempt in enumerate(attempts, start=1):
+        planner_attempts = [attempt for attempt in attempts if attempt.stage == ASK_PLAN_TASK]
+        later_attempts = [attempt for attempt in attempts if attempt.stage != ASK_PLAN_TASK]
+
+        for index, attempt in enumerate(planner_attempts, start=1):
+            record = {
+                **base_record,
+                "event": f"{attempt.stage}_attempt",
+                "attempt": index,
+                "is_retry": attempt.is_retry,
+                "provider": attempt.provider,
+                "model": attempt.model,
+                "started_at": attempt.started_at,
+                "finished_at": attempt.finished_at,
+                "duration_ms": attempt.duration_ms,
+                "prompt": attempt.prompt,
+                "messages": attempt.messages,
+                "output": attempt.output,
+            }
+            handle.write(_json_dumps(record, ensure_ascii=True) + "\n")
+
+        if validation is not None:
+            handle.write(
+                _json_dumps(
+                    {
+                        **base_record,
+                        "timestamp": validation_timestamp or datetime.now(UTC).isoformat(),
+                        "event": "validation_result",
+                        "validation": {
+                            "action": validation.action,
+                            "issues": [issue.model_dump() for issue in validation.issues],
+                            "intent": validation.intent.model_dump() if validation.intent is not None else None,
+                            "candidate_views": validation.candidate_views,
+                            "normalized_plan": (
+                                validation.normalized_plan.model_dump()
+                                if hasattr(validation.normalized_plan, "model_dump")
+                                else validation.normalized_plan
+                            ),
+                            "retry_feedback": validation.retry_feedback,
+                        },
+                    },
+                )
+                + "\n"
+            )
+
+        for index, attempt in enumerate(later_attempts, start=len(planner_attempts) + 1):
             record = {
                 **base_record,
                 "event": f"{attempt.stage}_attempt",
@@ -796,6 +875,7 @@ def _write_llm_trace(
                             "code": failure.code,
                             "message": failure.message,
                             "troubleshooting": failure.troubleshooting,
+                            "validation_issues": [issue.model_dump() for issue in failure.validation_issues],
                         },
                     },
                 )
@@ -928,6 +1008,8 @@ async def ask_question_async(
 ) -> AskResult:
     attempts: list[AskAttemptTrace] = []
     resolved_log_dir: Path | None = None
+    validation_result: PlanValidationResult | None = None
+    validation_timestamp: str | None = None
     requested_outputs = _normalize_requested_outputs(
         include_sql=include_sql,
         include_table=include_table,
@@ -965,7 +1047,7 @@ async def ask_question_async(
                 conn=conn,
                 requested_view=view,
             )
-            plan, plan_attempts = await _ask_with_semantic_retry(
+            plan, plan_attempts, validation_result = await _ask_with_semantic_retry(
                 planner,
                 plan_stage,
                 question,
@@ -973,15 +1055,27 @@ async def ask_question_async(
                 progress=progress,
             )
             attempts.extend(plan_attempts)
+            if validation_result is not None:
+                validation_timestamp = datetime.now(UTC).isoformat()
             if _is_empty_plan(plan):
                 raise AskExecutionError(
                     code="unsupported",
                     message="The available semantic views cannot answer this question.",
                     troubleshooting=_troubleshooting_for_error("unsupported"),
-                    failure_stage=plan_stage.stage,
+                    failure_stage="validation",
+                    validation_issues=validation_result.issues if validation_result is not None else [],
                 )
             semantic_request = _render_semantic_request(plan)
-            parsed_request = _build_parsed_request(plan)
+            try:
+                parsed_request = _build_parsed_request(plan)
+            except (ValueError, SemanticViewError) as exc:
+                raise AskExecutionError(
+                    code="validation",
+                    message=str(exc),
+                    troubleshooting=_troubleshooting_for_error("validation"),
+                    failure_stage="validation",
+                    validation_issues=validation_result.issues if validation_result is not None else [],
+                ) from exc
 
             _emit_progress(progress, "compiling semantic request")
             try:
@@ -1088,6 +1182,8 @@ async def ask_question_async(
                 execute=execute,
                 row_limit=row_limit,
                 attempts=attempts,
+                validation=validation_result,
+                validation_timestamp=validation_timestamp,
                 result=result,
             )
             _emit_progress(progress, "finished")
@@ -1103,6 +1199,8 @@ async def ask_question_async(
                 execute=execute,
                 row_limit=row_limit,
                 attempts=attempts,
+                validation=validation_result,
+                validation_timestamp=validation_timestamp,
                 failure=exc,
             )
             raise
@@ -1127,6 +1225,8 @@ async def ask_question_async(
                 execute=execute,
                 row_limit=row_limit,
                 attempts=attempts,
+                validation=validation_result,
+                validation_timestamp=validation_timestamp,
                 failure=failure,
             )
             raise failure from exc

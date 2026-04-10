@@ -65,8 +65,12 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
         aggregate_select_parts = []
         group_by_positions = []
         position = 1
-        for dimension in plan.dimensions:
-            aggregate_select_parts.append(dimension.request_name)
+        for output_name in plan.output_dimensions:
+            derived = next((item for item in plan.derived_dimensions if item.alias == output_name), None)
+            if derived is not None:
+                aggregate_select_parts.append(f"{derived.expr_sql} as {derived.alias}")
+            else:
+                aggregate_select_parts.append(output_name)
             group_by_positions.append(str(position))
             position += 1
 
@@ -84,11 +88,14 @@ def compile_sql(plan: QueryPlan, registry: SemanticViewRegistry) -> str:
 
     outer_select_parts = []
     for output_name in plan.output_dimensions:
-        derived = next((item for item in plan.derived_dimensions if item.alias == output_name), None)
-        if derived is not None:
-            outer_select_parts.append(f"{derived.expr_sql} as {derived.alias}")
-        else:
+        if plan.metrics:
             outer_select_parts.append(output_name)
+        else:
+            derived = next((item for item in plan.derived_dimensions if item.alias == output_name), None)
+            if derived is not None:
+                outer_select_parts.append(f"{derived.expr_sql} as {derived.alias}")
+            else:
+                outer_select_parts.append(output_name)
 
     for output_name in plan.output_metrics:
         derived = next((item for item in plan.derived_metrics if item.alias == output_name), None)

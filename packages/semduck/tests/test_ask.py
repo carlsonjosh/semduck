@@ -354,8 +354,10 @@ def test_ask_question_writes_llm_trace_when_enabled(loaded_conn, monkeypatch, tm
     assert "started_at" in records[0]
     assert "finished_at" in records[0]
     assert isinstance(records[0]["duration_ms"], int)
-    assert records[1]["event"] == "ask_summary_attempt"
-    assert records[1]["provider"] == "openai_compatible"
+    assert records[1]["event"] == "validation_result"
+    assert records[1]["validation"]["action"] == "accept"
+    assert records[2]["event"] == "ask_summary_attempt"
+    assert records[2]["provider"] == "openai_compatible"
     assert records[-1]["event"] == "ask_result"
     assert records[-1]["result"]["summary_model"] == "summary-model"
 
@@ -431,21 +433,11 @@ def test_ask_question_treats_planner_output_validation_failure_after_tool_use_as
         ask_question(loaded_conn, "What is total revenue by customer name?")
 
     assert excinfo.value.code == "unsupported"
-    assert excinfo.value.failure_stage == "ask_plan"
+    assert excinfo.value.failure_stage == "validation"
 
 
 def test_ask_question_writes_plan_attempts_for_compile_failure(loaded_conn, monkeypatch, tmp_path):
-    call_count = 0
-    original_compile = __import__(
-        "semduck.agent.ask",
-        fromlist=["compile_parsed_semantic_request"],
-    ).compile_parsed_semantic_request
-
     def flaky_compile(conn, parsed, *, request=None):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            return original_compile(conn, parsed, request=request)
         raise SemanticRegistryError("Unknown semantic view: orders ['customer_name'] ['total_revenue']")
 
     monkeypatch.setattr(
@@ -591,7 +583,7 @@ def test_ask_question_raises_unsupported_error_when_no_semantic_views_are_availa
         ask_question(loaded_conn, "What is total revenue?")
 
     assert excinfo.value.code == "unsupported"
-    assert excinfo.value.failure_stage == "ask_plan"
+    assert excinfo.value.failure_stage == "validation"
     assert "cannot answer this question" in excinfo.value.message
 
 
