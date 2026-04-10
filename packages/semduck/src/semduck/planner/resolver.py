@@ -25,6 +25,7 @@ from semduck.types import (
     ResolvedDerivedMetric,
     ResolvedDimension,
     ResolvedMetric,
+    ResolvedOrderBy,
     SemanticObject,
     SemanticTable,
     SemanticViewRegistry,
@@ -209,6 +210,8 @@ def build_query_plan(parsed: ParsedSemanticRequest, registry: SemanticViewRegist
     if parsed.where_clause:
         rewritten_where = rewrite_where_clause(parsed.where_clause, registry)
 
+    resolved_order_by = _resolve_order_by(parsed, output_dimensions, output_metrics)
+
     return QueryPlan(
         semantic_view_ref=parsed.semantic_view_ref,
         from_table=anchor_table.name,
@@ -222,6 +225,8 @@ def build_query_plan(parsed: ParsedSemanticRequest, registry: SemanticViewRegist
         output_dimensions=output_dimensions,
         output_metrics=output_metrics,
         where_clause=rewritten_where,
+        order_by=resolved_order_by,
+        limit=parsed.limit,
     )
 
 
@@ -487,3 +492,19 @@ def _append_output(outputs: list[str], seen: set[str], name: str) -> None:
         raise SemanticResolutionError(f"Duplicate output alias in semantic request: {name}")
     seen.add(name)
     outputs.append(name)
+
+
+def _resolve_order_by(
+    parsed: ParsedSemanticRequest,
+    output_dimensions: list[str],
+    output_metrics: list[str],
+) -> list[ResolvedOrderBy]:
+    valid_names = set(output_dimensions) | set(output_metrics)
+    resolved: list[ResolvedOrderBy] = []
+    for item in parsed.order_by:
+        if item.name not in valid_names:
+            raise SemanticResolutionError(
+                f"ORDER BY can only reference selected outputs: {item.name}"
+            )
+        resolved.append(ResolvedOrderBy(name=item.name, descending=item.descending))
+    return resolved

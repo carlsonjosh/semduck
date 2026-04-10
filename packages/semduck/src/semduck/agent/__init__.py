@@ -10,6 +10,14 @@ from semduck.agent.ask import (
     format_ask_result_json,
     format_ask_result_text,
 )
+from semduck.agent.validation import (
+    DEFAULT_VALIDATION_POLICY,
+    IntentSpec,
+    PlanValidationResult,
+    ValidationIssue,
+    ValidationPolicy,
+    validate_plan,
+)
 from semduck.agent.models import (
     CheckDefinitionArgs,
     CheckDefinitionResult,
@@ -45,6 +53,7 @@ __all__ = [
     "AskPlan",
     "AskExecutionError",
     "AskResult",
+    "DEFAULT_VALIDATION_POLICY",
     "CheckDefinitionArgs",
     "CheckDefinitionResult",
     "CompileRequestArgs",
@@ -52,10 +61,12 @@ __all__ = [
     "DescribeSemanticViewArgs",
     "InitRegistryArgs",
     "InitRegistryResult",
+    "IntentSpec",
     "ListSemanticViewsArgs",
     "ListSemanticViewsResult",
     "LoadDefinitionArgs",
     "LoadDefinitionResult",
+    "PlanValidationResult",
     "QueryRequestArgs",
     "QueryRequestResult",
     "SemanticJoinDescriptor",
@@ -64,6 +75,8 @@ __all__ = [
     "SemanticViewDescriptor",
     "SemduckServiceError",
     "ServiceErrorDetail",
+    "ValidationIssue",
+    "ValidationPolicy",
     "check_definition_service",
     "create_ask_agent",
     "create_ask_planner",
@@ -78,4 +91,5 @@ __all__ = [
     "list_semantic_views_service",
     "load_definition_service",
     "query_request_service",
+    "validate_plan",
 ]

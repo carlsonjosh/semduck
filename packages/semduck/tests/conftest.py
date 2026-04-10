@@ -62,3 +62,11 @@ def loaded_conn(conn, orders_yaml_path):
     )
     load_semantic_yaml_file(conn, str(orders_yaml_path))
     return conn
+
+
+@pytest.fixture
+def ecommerce_registry_conn(conn):
+    examples_dir = Path(__file__).resolve().parents[3] / "examples" / "ecommerce"
+    for filename in ("orders_semantic.yaml", "customer_semantic.yaml", "product_sales_semantic.yaml"):
+        load_semantic_yaml_file(conn, str(examples_dir / filename))
+    return conn

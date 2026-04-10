@@ -42,6 +42,8 @@ class ParsedSemanticRequest:
     dimensions: list[RequestedDimension] = field(default_factory=list)
     metrics: list[RequestedMetric] = field(default_factory=list)
     where_clause: Optional[str] = None
+    order_by: list["RequestedOrderBy"] = field(default_factory=list)
+    limit: int | None = None
 
 
 @dataclass
@@ -64,6 +66,7 @@ class SemanticTable:
     dimensions: dict[str, SemanticObject]
     metrics: dict[str, SemanticObject]
     facts: dict[str, SemanticObject]
+    primary_key_columns: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -118,6 +121,18 @@ class ResolvedDerivedMetric:
 
 
 @dataclass
+class RequestedOrderBy:
+    name: str
+    descending: bool = False
+
+
+@dataclass
+class ResolvedOrderBy:
+    name: str
+    descending: bool = False
+
+
+@dataclass
 class QueryPlan:
     semantic_view_ref: str
     from_table: str
@@ -131,6 +146,8 @@ class QueryPlan:
     output_dimensions: list[str]
     output_metrics: list[str]
     where_clause: Optional[str]
+    order_by: list[ResolvedOrderBy] = field(default_factory=list)
+    limit: int | None = None
 
 
 @dataclass

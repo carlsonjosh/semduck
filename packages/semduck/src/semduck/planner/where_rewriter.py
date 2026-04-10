@@ -41,5 +41,9 @@ def rewrite_where_clause(where_clause: str, registry: SemanticViewRegistry) -> s
     lookup = build_name_lookup(registry)
     rewritten = where_clause
     for name in sorted(lookup.keys(), key=len, reverse=True):
-        rewritten = re.sub(rf"\b{re.escape(name)}\b", lookup[name], rewritten)
+        rewritten = re.sub(
+            rf"(?<!\.)\b{re.escape(name)}\b",
+            lookup[name],
+            rewritten,
+        )
     return rewritten
