@@ -49,7 +49,7 @@ def load_semantic_view_registry(conn: Any, semantic_view_ref: str) -> SemanticVi
         ).fetchall()
         metric_rows = conn.execute(
             """
-            select metric_name, metric_type, expr, default_agg
+            select metric_name, expr
             from semantic.metrics
             where view_name = ? and table_name = ?
             """,
@@ -81,11 +81,9 @@ def load_semantic_view_registry(conn: Any, semantic_view_ref: str) -> SemanticVi
                 name=name,
                 object_type="metric",
                 expr=expr,
-                metric_type=metric_type,
-                default_agg=default_agg,
                 table_name=table_name,
             )
-            for name, metric_type, expr, default_agg in metric_rows
+            for name, expr in metric_rows
         }
         tables[table_name] = SemanticTable(
             name=table_name,

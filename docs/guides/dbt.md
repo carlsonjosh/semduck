@@ -43,6 +43,7 @@ Create a dbt model using the `semduck_semantic` materialization:
 
 create semantic view orders_semantic as
 table orders as {{ ref('orders') }}
+table {{ ref('orders') }} as orders
   dimensions (
     region as region
   )

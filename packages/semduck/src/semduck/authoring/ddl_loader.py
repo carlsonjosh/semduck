@@ -8,7 +8,7 @@ from semduck.errors import SemanticValidationError
 
 
 _CREATE_RE = re.compile(r"^create\s+semantic\s+view\s+([A-Za-z_][A-Za-z0-9_]*)\s+as$", re.IGNORECASE)
-_TABLE_RE = re.compile(r"^table\s+([A-Za-z_][A-Za-z0-9_]*)\s+as\s+(.+)$", re.IGNORECASE)
+_TABLE_RE = re.compile(r"^table\s+(.+)\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$", re.IGNORECASE)
 _JOIN_RE = re.compile(r"^join\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$", re.IGNORECASE)
 _PRIMARY_KEY_RE = re.compile(r"^primary\s+key\s*\((.*)\)$", re.IGNORECASE)
 _SECTION_RE = re.compile(
@@ -22,10 +22,7 @@ _FIELD_TAIL_RE = re.compile(
     r"^(?:\s+type\s+([A-Za-z_][A-Za-z0-9_]*|\"[^\"]+\"))?(?:\s+description\s+'((?:''|[^'])*)')?\s*$",
     re.IGNORECASE | re.DOTALL,
 )
-_METRIC_TAIL_RE = re.compile(
-    r"^(?:\s+default_agg\s+([A-Za-z_][A-Za-z0-9_]*))?(?:\s+description\s+'((?:''|[^'])*)')?\s*$",
-    re.IGNORECASE | re.DOTALL,
-)
+_METRIC_TAIL_RE = re.compile(r"^(?:\s+description\s+'((?:''|[^'])*)')?\s*$", re.IGNORECASE | re.DOTALL)
 
 
 def load_ddl_spec(ddl_text: str) -> dict[str, Any]:
@@ -52,8 +49,8 @@ def parse_semantic_ddl(ddl_text: str) -> dict[str, Any]:
         if table_match is not None:
             current_join = None
             current_table = {
-                "name": table_match.group(1),
-                "base_table": _parse_relation_name(table_match.group(2)),
+                "name": table_match.group(2),
+                "base_table": _parse_relation_name(table_match.group(1)),
             }
             spec["tables"].append(current_table)
             continue
@@ -238,48 +235,13 @@ def _parse_metric_def(item: str) -> dict[str, Any]:
     tail_match = _METRIC_TAIL_RE.match(match.group(2))
     if tail_match is None:
         raise SemanticValidationError(f"Invalid metric definition: {item}")
-    try:
-        metric_type, parsed_expr, metric_tail = _parse_metric_call(expr)
-        if metric_tail.strip():
-            raise SemanticValidationError(f"Invalid metric definition: {item}")
-        expr = parsed_expr
-    except SemanticValidationError:
-        metric_type = "expr"
     obj: dict[str, Any] = {
         "name": match.group(1).strip(),
-        "metric_type": metric_type,
         "expr": expr.strip(),
     }
     if tail_match.group(1):
-        obj["default_agg"] = tail_match.group(1)
-    if tail_match.group(2):
-        obj["description"] = _unescape_string(tail_match.group(2))
+        obj["description"] = _unescape_string(tail_match.group(1))
     return obj
-
-
-def _parse_metric_call(remainder: str) -> tuple[str, str, str]:
-    remainder = remainder.strip()
-    open_paren = remainder.find("(")
-    if open_paren == -1:
-        raise SemanticValidationError(
-            f"Metric expression must use <metric_type>(<expr>) when using an aggregate: {remainder}"
-        )
-    metric_type = remainder[:open_paren].strip()
-    depth = 0
-    in_quotes = False
-    for index in range(open_paren, len(remainder)):
-        ch = remainder[index]
-        if ch == "'" and (index == 0 or remainder[index - 1] != "\\"):
-            in_quotes = not in_quotes
-        elif ch == "(" and not in_quotes:
-            depth += 1
-        elif ch == ")" and not in_quotes:
-            depth -= 1
-            if depth == 0:
-                expr = remainder[open_paren + 1 : index].strip()
-                tail = remainder[index + 1 :]
-                return metric_type, expr, tail
-    raise SemanticValidationError(f"Unclosed metric expression: {remainder}")
 
 
 def _split_top_level_as(value: str, *, label: str) -> tuple[str, str]:

@@ -85,8 +85,6 @@ class SemanticObjectDescriptor(BaseModel):
     object_type: str
     expr: str
     data_type: str | None = None
-    default_agg: str | None = None
-    metric_type: str | None = None
 
 
 class SemanticTableDescriptor(BaseModel):

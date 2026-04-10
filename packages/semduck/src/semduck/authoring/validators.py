@@ -52,15 +52,16 @@ def _validate_metrics(metrics: list[dict[str, Any]]) -> None:
         obj = _require_mapping(metric, "metrics")
         name = obj.get("name")
         expr = obj.get("expr")
-        metric_type = obj.get("metric_type")
         if not name:
             raise SemanticValidationError("metrics item missing name")
         if name in seen:
             raise SemanticValidationError(f"Duplicate metrics name: {name}")
         if not expr:
             raise SemanticValidationError(f"metric {name} missing expr")
-        if not metric_type:
-            raise SemanticValidationError(f"metric {name} missing metric_type")
+        if "metric_type" in obj:
+            raise SemanticValidationError(f"metric {name} must not define metric_type")
+        if "default_agg" in obj:
+            raise SemanticValidationError(f"metric {name} must not define default_agg")
         seen.add(name)
 
 

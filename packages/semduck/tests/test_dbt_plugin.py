@@ -11,7 +11,7 @@ VALID_SPEC = {
             "name": "orders",
             "base_table": {"table": "orders_base"},
             "dimensions": [{"name": "region", "expr": "region"}],
-            "metrics": [{"name": "order_count", "metric_type": "count", "expr": "order_id"}],
+            "metrics": [{"name": "order_count", "expr": "count(order_id)"}],
         }
     ],
 }
@@ -90,7 +90,7 @@ def test_register_connection_registers_ddl_udfs(conn):
     register_connection(conn)
     ddl_text = """
 create semantic view sample as
-table orders as mart.orders_base
+table mart.orders_base as orders
   dimensions (
     region as region
   )

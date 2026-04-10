@@ -3,7 +3,7 @@ from semduck import compile_request_sql, load_semantic_ddl
 
 VALID_DDL = """
 create semantic view orders_semantic as
-table orders as mart.orders_base
+table mart.orders_base as orders
   dimensions (
     region as region type varchar
   )
@@ -12,7 +12,7 @@ table orders as mart.orders_base
     count(order_id) as order_count
   )
 
-table customers as mart.customers_base
+table mart.customers_base as customers
   dimensions (
     customer_segment as customer_segment
   )
@@ -34,7 +34,7 @@ def test_load_semantic_ddl_validate_only(conn):
 def test_load_semantic_ddl_persists_registry(loaded_conn):
     ddl = """
 create semantic view replacement_semantic as
-table orders as mart.orders_base
+table mart.orders_base as orders
   dimensions (
     region as region
   )
@@ -62,7 +62,7 @@ def test_load_semantic_ddl_supports_formula_metrics(conn):
     )
     ddl = """
 create semantic view orders_semantic as
-table orders as mart.orders_base
+table mart.orders_base as orders
   facts (
     order_total as order_total
   )
@@ -75,7 +75,7 @@ table orders as mart.orders_base
     load_semantic_ddl(conn, ddl)
     sql = compile_request_sql(conn, "orders_semantic metrics average_order_value")
     assert "sum(order_total) as total_revenue" in sql
-    assert "count(order_count__input) as order_count" in sql
+    assert "count(order_count__order_id) as order_count" in sql
     assert "(total_revenue) / (order_count) as average_order_value" in sql
 
 
@@ -90,6 +90,6 @@ table orders as mart.orders_base
     try:
         load_semantic_ddl(conn, ddl, validate_only=True)
     except Exception as exc:
-        assert "Invalid metric definition" in str(exc)
+        assert "Unexpected semantic DDL line" in str(exc)
     else:
-        raise AssertionError("expected alias-first DDL to fail")
+        raise AssertionError("expected semantic-name-first table declaration to fail")

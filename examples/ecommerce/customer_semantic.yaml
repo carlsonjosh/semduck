@@ -32,8 +32,7 @@ tables:
         data_type: date
     metrics:
       - name: customer_count
-        metric_type: count_distinct
-        expr: customer_id
+        expr: count(distinct customer_id)
 
   - name: customer_segments
     base_table:
@@ -70,13 +69,10 @@ tables:
         data_type: double
     metrics:
       - name: order_count
-        metric_type: count
-        expr: order_id
+        expr: count(order_id)
       - name: lifetime_value
-        metric_type: sum
-        expr: total_amount
+        expr: sum(total_amount)
       - name: average_order_value
-        metric_type: expr
         expr: lifetime_value / order_count
 
 joins:
