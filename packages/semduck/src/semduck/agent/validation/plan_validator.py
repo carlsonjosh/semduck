@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .intent_parser import infer_intent
-from .models import PlanValidationResult, ValidationIssue
+from .concept_store import ensure_semantic_concepts
+from .concepts import view_field_lookup
+from .intent_builder import resolve_question_intent
+from .models import PlanValidationResult, SemanticConceptIndex, ValidationIssue
 from .policy import DEFAULT_VALIDATION_POLICY, ValidationPolicy
 from .retry_builder import build_retry_feedback
-from .schema_index import build_schema_index, views_covering
+from .schema_index import build_schema_index
 
 
 def _derived_time_alias(field: str, grain: str) -> str:
@@ -40,18 +42,6 @@ def _match_unaliased_time_transform(item: str) -> tuple[str, str] | None:
     return match.group("grain").lower(), match.group("field")
 
 
-def _selected_dimension_names(plan: Any, policy: ValidationPolicy) -> set[str]:
-    names: set[str] = set()
-    for item in plan.dimensions:
-        transformed = _match_time_transform(item, policy)
-        if transformed is not None:
-            _, field, _ = transformed
-            names.add(field)
-            continue
-        names.add(item)
-    return names
-
-
 def _selected_sort_name(plan: Any) -> str | None:
     if not plan.order_by:
         return None
@@ -62,12 +52,7 @@ def _selected_sort_name(plan: Any) -> str | None:
     return candidate
 
 
-def _normalize_time_bucket_aliases(
-    plan: Any,
-    chosen_view: Any | None,
-    *,
-    add_issue,
-) -> Any:
+def _normalize_time_bucket_aliases(plan: Any, chosen_view: Any | None, *, add_issue) -> Any:
     if chosen_view is None:
         return plan
 
@@ -106,12 +91,52 @@ def _normalize_time_bucket_aliases(
             expression = tokens[0].strip()
             suffix = f" {tokens[1].lower()}"
         replacement = replacements.get(expression)
-        if replacement is not None:
-            normalized_order_by.append(f"{replacement}{suffix}")
-        else:
-            normalized_order_by.append(item)
+        normalized_order_by.append(f"{replacement}{suffix}" if replacement is not None else item)
     normalized.order_by = normalized_order_by
     return normalized
+
+
+def _candidate_views(index: SemanticConceptIndex, intent) -> list[str]:
+    required = set(intent.required_dimensions).union(intent.required_metrics, intent.required_modifiers)
+    if not required:
+        return sorted({field.view_name for field in index.fields})
+    per_view: dict[str, set[str]] = {}
+    for field in index.fields:
+        per_view.setdefault(field.view_name, set()).add(field.concept_id)
+    return sorted(view_name for view_name, concepts in per_view.items() if required.issubset(concepts))
+
+
+def _selected_concepts(plan: Any, chosen_view_name: str, index: SemanticConceptIndex, policy: ValidationPolicy) -> tuple[set[str], set[str]]:
+    lookup = view_field_lookup(index).get(chosen_view_name, {})
+    selected_dimensions: set[str] = set()
+    selected_metrics: set[str] = set()
+
+    for metric in plan.metrics:
+        for field in lookup.get(metric, []):
+            if field.concept_kind == "metric":
+                selected_metrics.add(field.concept_id)
+
+    for item in plan.dimensions:
+        transformed = _match_time_transform(item, policy)
+        field_name = transformed[1] if transformed is not None else item
+        for field in lookup.get(field_name, []):
+            if field.concept_kind == "dimension":
+                selected_dimensions.add(field.concept_id)
+            elif field.concept_kind == "modifier":
+                selected_dimensions.add(field.concept_id)
+    return selected_dimensions, selected_metrics
+
+
+def _preferred_recent_field(index: SemanticConceptIndex, view_name: str) -> str | None:
+    candidates = [
+        field
+        for field in index.fields
+        if field.view_name == view_name and field.concept_id == "recent"
+    ]
+    if not candidates:
+        return None
+    preferred = next((field for field in candidates if field.is_preferred), None)
+    return (preferred or candidates[0]).field_name
 
 
 def validate_plan(
@@ -121,13 +146,10 @@ def validate_plan(
     *,
     policy: ValidationPolicy = DEFAULT_VALIDATION_POLICY,
 ) -> PlanValidationResult:
-    index = build_schema_index(conn)
-    intent = infer_intent(question, index, policy=policy)
-    candidate_views = views_covering(
-        index,
-        dimensions=intent.required_dimensions,
-        metrics=intent.required_metrics,
-    )
+    schema_index = build_schema_index(conn)
+    concept_index = ensure_semantic_concepts(conn, policy)
+    intent = resolve_question_intent(question, concept_index, policy=policy)
+    candidate_views = _candidate_views(concept_index, intent)
     issues: list[ValidationIssue] = []
     normalized_plan = plan.model_copy(deep=True)
 
@@ -166,15 +188,14 @@ def validate_plan(
             )
             result.retry_feedback = build_retry_feedback(result)
             return result
-
         add_issue(
             "unsupported_question",
             "The available semantic views cannot answer this question without substitution.",
         )
-        if intent.required_dimensions or intent.required_metrics:
+        if intent.required_dimensions or intent.required_metrics or intent.required_modifiers:
             add_issue(
                 "no_single_view_covers_request",
-                "No single described semantic view contains all required dimensions and metrics.",
+                "No single described semantic view contains all required concepts.",
             )
         result = PlanValidationResult(
             is_valid=False,
@@ -187,7 +208,7 @@ def validate_plan(
         result.retry_feedback = build_retry_feedback(result)
         return result
 
-    chosen_view = next((view for view in index.views if view.view_name == normalized_plan.chosen_view), None)
+    chosen_view = next((view for view in schema_index.views if view.view_name == normalized_plan.chosen_view), None)
     if chosen_view is None:
         add_issue(
             "unknown_view",
@@ -196,11 +217,7 @@ def validate_plan(
             details={"chosen_view": normalized_plan.chosen_view},
         )
     else:
-        normalized_plan = _normalize_time_bucket_aliases(
-            normalized_plan,
-            chosen_view,
-            add_issue=add_issue,
-        )
+        normalized_plan = _normalize_time_bucket_aliases(normalized_plan, chosen_view, add_issue=add_issue)
         for metric in normalized_plan.metrics:
             if metric not in chosen_view.metrics:
                 add_issue(
@@ -235,14 +252,14 @@ def validate_plan(
                 details={"candidate_view": candidate_views[0]},
             )
 
-    if not candidate_views and (intent.required_dimensions or intent.required_metrics):
+    if not candidate_views and (intent.required_dimensions or intent.required_metrics or intent.required_modifiers):
         add_issue(
             "unsupported_question",
             "No single semantic view covers the required concepts from the question.",
         )
         add_issue(
             "no_single_view_covers_request",
-            "No single described semantic view contains all required dimensions and metrics.",
+            "No single described semantic view contains all required concepts.",
         )
         result = PlanValidationResult(
             is_valid=False,
@@ -255,25 +272,27 @@ def validate_plan(
         result.retry_feedback = build_retry_feedback(result)
         return result
 
-    selected_dimensions = _selected_dimension_names(normalized_plan, policy)
+    selected_dimensions, selected_metrics = _selected_concepts(
+        normalized_plan,
+        normalized_plan.chosen_view,
+        concept_index,
+        policy,
+    )
     for required_metric in intent.required_metrics:
-        if required_metric not in normalized_plan.metrics:
+        if required_metric not in selected_metrics:
             selected_metric = normalized_plan.metrics[0] if normalized_plan.metrics else None
             add_issue(
                 "forbidden_metric_substitution" if selected_metric else "missing_metric",
-                f"Question requires metric {required_metric}.",
+                f"Question requires metric concept {required_metric}.",
                 field="metrics",
-                details={
-                    "required_metric": required_metric,
-                    "selected_metric": selected_metric,
-                },
+                details={"required_metric": required_metric, "selected_metric": selected_metric},
             )
 
     for required_dimension in intent.required_dimensions:
         if required_dimension not in selected_dimensions:
             add_issue(
                 "forbidden_dimension_substitution",
-                f"Question requires dimension {required_dimension}.",
+                f"Question requires dimension concept {required_dimension}.",
                 field="dimensions",
                 details={"required_dimension": required_dimension},
             )
@@ -285,12 +304,19 @@ def validate_plan(
                 "Ranking questions require order_by.",
                 field="order_by",
             )
-        elif intent.sort_metric is not None and _selected_sort_name(normalized_plan) != intent.sort_metric:
-            add_issue(
-                "missing_order_by_for_ranking",
-                f"Ranking questions should order by {intent.sort_metric}.",
-                field="order_by",
-            )
+        elif intent.sort_metric is not None:
+            selected_sort = _selected_sort_name(normalized_plan)
+            sort_concepts = {
+                field.concept_id
+                for field in view_field_lookup(concept_index).get(normalized_plan.chosen_view, {}).get(selected_sort or "", [])
+                if field.concept_kind == "metric"
+            }
+            if intent.sort_metric not in sort_concepts and selected_sort != intent.sort_metric:
+                add_issue(
+                    "missing_order_by_for_ranking",
+                    f"Ranking questions should order by the {intent.sort_metric} concept.",
+                    field="order_by",
+                )
 
     if intent.required_time_grain is not None:
         matching_time_bucket = False
@@ -299,22 +325,31 @@ def validate_plan(
             if transformed is None:
                 continue
             grain, field, _ = transformed
-            time_dimension_matches = True
-            if intent.required_time_dimension_confident and intent.required_time_dimension is not None:
-                time_dimension_matches = field == intent.required_time_dimension
-            if grain == intent.required_time_grain and time_dimension_matches:
-                matching_time_bucket = True
-                break
+            if grain == intent.required_time_grain:
+                if not intent.required_time_dimension_confident or intent.required_time_dimension is None:
+                    matching_time_bucket = True
+                    break
+                dimension_lookup = view_field_lookup(concept_index).get(normalized_plan.chosen_view, {}).get(field, [])
+                if any(binding.concept_id == intent.required_time_dimension for binding in dimension_lookup):
+                    matching_time_bucket = True
+                    break
         if not matching_time_bucket:
             add_issue(
                 "missing_time_grain",
                 f"Question requires a {intent.required_time_grain} time bucket.",
                 field="dimensions",
-                details={
-                    "grain": intent.required_time_grain,
-                    "time_dimension": intent.required_time_dimension,
-                    "time_dimension_confident": intent.required_time_dimension_confident,
-                },
+                details={"grain": intent.required_time_grain, "time_dimension": intent.required_time_dimension},
+            )
+
+    if "recent" in intent.required_modifiers:
+        recent_field = _preferred_recent_field(concept_index, normalized_plan.chosen_view)
+        where_clause = (normalized_plan.where_clause or "").lower()
+        if recent_field is None or recent_field.lower() not in where_clause:
+            add_issue(
+                "missing_recent_filter",
+                "Question requires a recent time filter.",
+                field="where_clause",
+                details={"time_dimension": recent_field, "window": intent.recent_window},
             )
 
     has_errors = any(issue.severity == "error" for issue in issues)

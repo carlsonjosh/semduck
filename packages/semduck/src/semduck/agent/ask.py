@@ -23,6 +23,8 @@ from semduck.agent.services import (
     list_semantic_views_service,
 )
 from semduck.agent.validation import DEFAULT_VALIDATION_POLICY, PlanValidationResult, ValidationIssue, validate_plan
+from semduck.agent.validation.concept_store import ensure_semantic_concepts
+from semduck.agent.validation.intent_builder import resolve_question_intent
 from semduck.errors import (
     SemanticCompileError,
     SemanticJoinError,
@@ -40,6 +42,7 @@ from semduck.llm import (
 )
 from semduck.llm.config import ResolvedLLMConfig
 from semduck.parser.request_parser import parse_request
+from semduck.api import init_registry
 from semduck.registry.reader import load_semantic_view_registry
 from semduck.runtime.executor import compile_parsed_semantic_request
 from semduck.types import ParsedSemanticRequest, RequestedOrderBy
@@ -406,8 +409,19 @@ def _normalize_plan_aliases(conn: Any, plan: AskPlan) -> AskPlan:
         return plan
 
     registry = load_semantic_view_registry(conn, plan.chosen_view)
+    semantic_field_names = {
+        *registry.tables.keys(),
+        *(name for table in registry.tables.values() for name in table.dimensions.keys()),
+        *(name for table in registry.tables.values() for name in table.metrics.keys()),
+        *(name for table in registry.tables.values() for name in table.facts.keys()),
+    }
     aliases = sorted(
         (table.alias for table in registry.tables.values() if table.alias),
+        key=len,
+        reverse=True,
+    )
+    table_names = sorted(
+        registry.tables.keys(),
         key=len,
         reverse=True,
     )
@@ -427,6 +441,25 @@ def _normalize_plan_aliases(conn: Any, plan: AskPlan) -> AskPlan:
         normalized.metrics = [strip_aliases(item) or "" for item in normalized.metrics]
         normalized.order_by = [strip_aliases(item) or "" for item in normalized.order_by]
         normalized.where_clause = strip_aliases(normalized.where_clause)
+
+    if table_names:
+        def strip_safe_table_qualifiers(value: str | None) -> str | None:
+            if value is None:
+                return None
+
+            def replace(match: re.Match[str]) -> str:
+                qualified = match.group(0)
+                qualifier, suffix = qualified.split(".", 1)
+                if qualifier in table_names and suffix in semantic_field_names:
+                    return suffix
+                return qualified
+
+            return QUALIFIED_IDENTIFIER_RE.sub(replace, value)
+
+        normalized.dimensions = [strip_safe_table_qualifiers(item) or "" for item in normalized.dimensions]
+        normalized.metrics = [strip_safe_table_qualifiers(item) or "" for item in normalized.metrics]
+        normalized.order_by = [strip_safe_table_qualifiers(item) or "" for item in normalized.order_by]
+        normalized.where_clause = strip_safe_table_qualifiers(normalized.where_clause)
 
     remaining_qualified_refs: list[str] = []
     for value in [
@@ -584,6 +617,38 @@ def _normalize_requested_outputs(
     return requested_outputs
 
 
+def _build_concept_guidance(question: str, conn) -> str:
+    concept_index = ensure_semantic_concepts(conn, DEFAULT_VALIDATION_POLICY)
+    intent = resolve_question_intent(question, concept_index, policy=DEFAULT_VALIDATION_POLICY)
+    candidate_views = sorted(
+        view_name
+        for view_name in {field.view_name for field in concept_index.fields}
+        if set(intent.required_dimensions).union(intent.required_metrics, intent.required_modifiers).issubset(
+            {
+                field.concept_id
+                for field in concept_index.fields
+                if field.view_name == view_name
+            }
+        )
+    )
+    lines = [
+        "Resolved semantic context:",
+        f"- required_dimension_concepts: {intent.required_dimensions}",
+        f"- required_metric_concepts: {intent.required_metrics}",
+        f"- required_modifier_concepts: {intent.required_modifiers}",
+        f"- required_time_grain: {intent.required_time_grain!r}",
+        f"- ranking_sort_concept: {intent.sort_metric!r}",
+        f"- candidate_views: {candidate_views}",
+    ]
+    if intent.recent_window is not None:
+        lines.append(f"- recent_window: {intent.recent_window}")
+    lines.append(
+        "Use this resolved semantic context when choosing a view and fields. "
+        "Do not drop required concepts from the final structured plan."
+    )
+    return "\n".join(lines)
+
+
 async def _ask_with_semantic_retry(
     agent: Agent[AskDependencies, AskPlan],
     stage_model: AskStageModel,
@@ -593,9 +658,10 @@ async def _ask_with_semantic_retry(
     progress: AskProgressReporter | None = None,
 ) -> tuple[AskPlan, list[AskAttemptTrace], PlanValidationResult | None]:
     attempts: list[AskAttemptTrace] = []
+    planner_prompt = f"{_build_concept_guidance(question, deps.conn)}\n\nQuestion: {question}"
     _emit_progress(progress, "planning semantic request")
     try:
-        plan, initial_attempt = await _run_agent(agent, question, deps=deps, stage_model=stage_model)
+        plan, initial_attempt = await _run_agent(agent, planner_prompt, deps=deps, stage_model=stage_model)
     except AskAgentRunError as exc:
         attempts.append(exc.attempt)
         if _is_output_validation_failure(exc.cause) and _messages_show_successful_tool_inspection(exc.attempt.messages):
@@ -645,6 +711,7 @@ async def _ask_with_semantic_retry(
 
     _emit_progress(progress, "retrying planner after validator rejection")
     retry_prompt = (
+        f"{_build_concept_guidance(question, deps.conn)}\n\n"
         f"{question}\n\n"
         "Fix the previous structured request.\n"
         f"Previous plan: chosen_view={plan.chosen_view!r}, dimensions={plan.dimensions!r}, "
@@ -895,6 +962,7 @@ def create_ask_planner(model: Any) -> Agent[AskDependencies, AskPlan]:
             "Do not return prose, summaries, SQL, markdown, code fences, reasoning, pseudo-tool text, or schema descriptions. "
             "Only use exact view names returned by list_semantic_views. "
             "Only use dimensions and metrics confirmed by describe_semantic_view. "
+            "Use ai_context metadata from describe_semantic_view when present to preserve canonical concepts and preferred phrasing. "
             "Treat a semantic view as answerable if one described view contains all requested dimensions and metrics anywhere in that view, including across joined tables. "
             "A single semantic view may satisfy a question using fields from different joined tables inside that view; this still counts as one view. "
             "Your only valid final actions are: choose one described semantic view, or return the null plan. "
@@ -1030,6 +1098,7 @@ async def ask_question_async(
         planner = create_ask_planner(plan_stage.agent_model)
         summary_agent = create_ask_summary_agent(summary_stage.agent_model) if summary_stage is not None else None
         conn, should_close = _connect_if_needed(conn_or_db)
+        init_registry(conn)
     except (ValueError, FileNotFoundError) as exc:
         _emit_progress(progress, "failed")
         raise AskExecutionError(

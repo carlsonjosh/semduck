@@ -8,6 +8,7 @@ def init_registry_schema(conn: Any) -> None:
     ddl_path = files("semduck.ddl").joinpath("registry.sql")
     conn.execute(ddl_path.read_text(encoding="utf-8"))
     _migrate_metrics_schema(conn)
+    _migrate_ai_context_columns(conn)
 
 
 def _migrate_metrics_schema(conn: Any) -> None:
@@ -69,3 +70,23 @@ def _migrate_metrics_schema(conn: Any) -> None:
         from semantic.metrics
         """
     )
+
+
+def _migrate_ai_context_columns(conn: Any) -> None:
+    table_columns = {
+        "semantic.semantic_views": ["ai_context"],
+        "semantic.semantic_view_tables": ["ai_context"],
+        "semantic.dimensions": ["ai_context"],
+        "semantic.facts": ["ai_context"],
+        "semantic.metrics": ["ai_context"],
+        "semantic.joins": ["ai_context"],
+    }
+    for table_name, columns_to_add in table_columns.items():
+        existing_columns = {
+            row[1]
+            for row in conn.execute(f"pragma table_info('{table_name}')").fetchall()
+        }
+        for column_name in columns_to_add:
+            if column_name in existing_columns:
+                continue
+            conn.execute(f"alter table {table_name} add column {column_name} text")

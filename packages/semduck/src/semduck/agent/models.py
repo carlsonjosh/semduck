@@ -85,6 +85,7 @@ class SemanticObjectDescriptor(BaseModel):
     object_type: str
     expr: str
     data_type: str | None = None
+    ai_context: dict[str, Any] | None = None
 
 
 class SemanticTableDescriptor(BaseModel):
@@ -95,6 +96,7 @@ class SemanticTableDescriptor(BaseModel):
     dimensions: list[SemanticObjectDescriptor]
     metrics: list[SemanticObjectDescriptor]
     facts: list[SemanticObjectDescriptor]
+    ai_context: dict[str, Any] | None = None
 
 
 class SemanticJoinDescriptor(BaseModel):
@@ -102,9 +104,11 @@ class SemanticJoinDescriptor(BaseModel):
     right_table: str
     join_type: str
     join_expr: str
+    ai_context: dict[str, Any] | None = None
 
 
 class SemanticViewDescriptor(BaseModel):
     view_name: str
     tables: list[SemanticTableDescriptor]
     joins: list[SemanticJoinDescriptor]
+    ai_context: dict[str, Any] | None = None

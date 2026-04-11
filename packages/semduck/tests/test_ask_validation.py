@@ -110,8 +110,8 @@ def test_validate_plan_accepts_signup_month_when_time_field_fallback_is_uncertai
 
     assert result.action == "accept"
     assert result.intent.required_time_grain == "month"
-    assert result.intent.required_time_dimension == "order_date"
-    assert result.intent.required_time_dimension_confident is False
+    assert result.intent.required_time_dimension == "signup_date"
+    assert result.intent.required_time_dimension_confident is True
 
 
 def test_validate_plan_accepts_customer_state_without_requiring_state_synonym(ecommerce_registry_conn):
@@ -230,6 +230,40 @@ def test_ask_question_surfaces_validation_issues_for_unsupported(ecommerce_regis
 
     assert excinfo.value.failure_stage == "validation"
     assert any(issue.code == "unsupported_question" for issue in excinfo.value.validation_issues)
+
+
+def test_ask_question_normalizes_table_qualified_semantic_fields(ecommerce_registry_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan"),
+            None,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: SequencedFakeAgent(
+            [
+                AskPlan(
+                    chosen_view="product_sales_semantic",
+                    dimensions=["products.product_name"],
+                    metrics=["order_items.net_item_sales"],
+                    order_by=["order_items.net_item_sales desc"],
+                )
+            ]
+        ),
+    )
+
+    result = ask_question(
+        ecommerce_registry_conn,
+        "Which products have the highest product revenue?",
+        include_sql=True,
+    )
+
+    assert result.chosen_view == "product_sales_semantic"
+    assert result.semantic_request == "product_sales_semantic dimensions product_name metrics net_item_sales"
+    assert result.order_by == ["net_item_sales desc"]
 
 
 def test_ask_question_retries_when_null_plan_has_false_unsupported_candidate(ecommerce_registry_conn, monkeypatch):

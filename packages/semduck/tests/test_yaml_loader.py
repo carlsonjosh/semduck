@@ -118,3 +118,34 @@ tables:
     assert "sum(order_revenue) as total_revenue" in sql
     assert "sum(order_profit) as total_profit" in sql
     assert "(total_profit) / (total_revenue) as margin_pct" in sql
+
+
+def test_yaml_accepts_recursive_ai_context(conn):
+    yaml_text = """
+name: sample
+ai_context:
+  concepts:
+    - concept_id: recent
+      concept_kind: modifier
+      phrases: [recent]
+tables:
+  - name: orders
+    base_table:
+      table: orders_base
+    ai_context:
+      phrases: [orders]
+    dimensions:
+      - name: region
+        expr: region
+        ai_context:
+          concept_id: region
+          phrases: [region, regions]
+    metrics:
+      - name: order_count
+        expr: count(order_id)
+        ai_context:
+          concept_id: order_count
+          phrases: [order count]
+"""
+    result = load_semantic_yaml(conn, yaml_text, validate_only=True)
+    assert result.ok is True

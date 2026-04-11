@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: sev_orders
+    meta:
+      ai_context:
+        concepts:
+          - concept_id: recent
+            concept_kind: modifier
+            phrases: [recent, recently]
+            default_window: 30 days
+            time_dimension: order_date
+    columns:
+      - name: order_date
+        meta:
+          ai_context:
+            concepts:
+              - concept_id: order_date
+                phrases: [order date, purchase date]
+      - name: customer_name
+        meta:
+          ai_context:
+            concepts:
+              - concept_id: customer_name
+                phrases: [customer, customer name, purchaser, diner]
+      - name: total_revenue
+        meta:
+          ai_context:
+            concepts:
+              - concept_id: total_revenue
+                phrases: [revenue, total revenue]
+                preferred: true
+      - name: order_count
+        meta:
+          ai_context:
+            concepts:
+              - concept_id: order_count
+                phrases: [order count, orders]
+      - name: average_order_value
+        meta:
+          ai_context:
+            concepts:
+              - concept_id: average_order_value
+                phrases: [average order value, AOV]
+              - concept_id: ticket_size
+                phrases: [ticket size, average ticket size]

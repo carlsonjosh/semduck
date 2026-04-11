@@ -1,6 +1,12 @@
 import json
 
-from semduck import compile_request_sql, load_semantic_ddl, load_semantic_spec, register_connection
+from semduck import (
+    compile_request_sql,
+    get_semantic_view,
+    load_semantic_ddl,
+    load_semantic_spec,
+    register_connection,
+)
 from semduck.errors import SemanticValidationError
 
 
@@ -103,3 +109,132 @@ table mart.orders_base as orders
         f"select semduck_check_ddl('{ddl_sql}') as status"
     ).fetchone()[0]
     assert status == "ok check view_name=sample"
+
+
+def test_register_connection_registers_ddl_udfs_with_dbt_meta(conn):
+    register_connection(conn)
+    ddl_text = """
+create semantic view sample as
+table mart.orders_base as orders
+  dimensions (
+    region as region
+  )
+  metrics (
+    count(order_id) as order_count
+  );
+"""
+    payload = json.dumps(
+        {
+            "columns": {
+                "region": {
+                    "meta": {
+                        "ai_context": {
+                            "concepts": [
+                                {"concept_id": "region", "phrases": ["region"]}
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    ).replace("'", "''")
+    ddl_sql = ddl_text.replace("'", "''")
+    status = conn.sql(
+        "select semduck_check_ddl_with_dbt_meta("
+        f"'{ddl_sql}', "
+        f"'{payload}'"
+        ") as status"
+    ).fetchone()[0]
+    assert status == "ok check view_name=sample"
+
+
+def test_load_semantic_ddl_applies_dbt_meta_ai_context_overlay(loaded_conn):
+    ddl_text = """
+create semantic view sample as
+table mart.orders_base as orders
+  dimensions (
+    region as region
+  )
+  metrics (
+    count(order_id) as order_count
+  );
+"""
+    dbt_metadata = {
+        "meta": {
+            "ai_context": {
+                "concepts": [
+                    {
+                        "concept_id": "recent",
+                        "concept_kind": "modifier",
+                        "phrases": ["recent"],
+                        "default_window": "30 days",
+                        "time_dimension": "region",
+                    }
+                ]
+            }
+        },
+        "columns": {
+            "region": {
+                "meta": {
+                    "ai_context": {
+                        "concepts": [
+                            {"concept_id": "region", "phrases": ["region", "regions"]}
+                        ]
+                    }
+                }
+            },
+            "order_count": {
+                "meta": {
+                    "ai_context": {
+                        "concepts": [
+                            {"concept_id": "order_count", "phrases": ["order count", "orders"]}
+                        ]
+                    }
+                }
+            },
+        },
+    }
+
+    load_semantic_ddl(loaded_conn, ddl_text, dbt_metadata=dbt_metadata)
+    registry = get_semantic_view(loaded_conn, "sample")
+    assert registry.ai_context == dbt_metadata["meta"]["ai_context"]
+    orders_table = registry.tables["orders"]
+    assert orders_table.dimensions["region"].ai_context == dbt_metadata["columns"]["region"]["meta"]["ai_context"]
+    assert orders_table.metrics["order_count"].ai_context == dbt_metadata["columns"]["order_count"]["meta"]["ai_context"]
+    concept_count = loaded_conn.execute("select count(*) from semantic.semantic_concepts").fetchone()[0]
+    assert concept_count > 0
+
+
+def test_load_semantic_ddl_rejects_ambiguous_dbt_column_ai_context(conn):
+    ddl_text = """
+create semantic view sample as
+table mart.orders_base as orders
+  dimensions (
+    region as region
+  )
+
+table mart.customer_base as customers
+  dimensions (
+    region as region
+  );
+"""
+    dbt_metadata = {
+        "columns": {
+            "region": {
+                "meta": {
+                    "ai_context": {
+                        "concepts": [
+                            {"concept_id": "region", "phrases": ["region"]}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    try:
+        load_semantic_ddl(conn, ddl_text, validate_only=True, dbt_metadata=dbt_metadata)
+    except SemanticValidationError as exc:
+        assert "ambiguous across multiple semantic objects" in str(exc)
+    else:
+        raise AssertionError("expected ambiguous dbt column ai_context to fail")

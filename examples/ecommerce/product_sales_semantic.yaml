@@ -1,5 +1,12 @@
 name: product_sales_semantic
 description: Item-level sales analytics across products, categories, and order context
+ai_context:
+  concepts:
+    - concept_id: recent
+      concept_kind: modifier
+      phrases: [recent, recently, recent sales]
+      default_window: 30 days
+      time_dimension: order_date
 
 tables:
   - name: order_items
@@ -30,12 +37,21 @@ tables:
     metrics:
       - name: units_sold
         expr: sum(quantity)
+        ai_context:
+          concept_id: units_sold
+          phrases: [units sold]
       - name: gross_item_sales
         expr: sum(gross_item_amount)
+        ai_context:
+          concept_id: gross_item_sales
+          phrases: [gross item sales]
       - name: item_discount
         expr: sum(discount_item_amount)
       - name: net_item_sales
         expr: sum(net_item_amount)
+        ai_context:
+          concept_id: product_revenue
+          phrases: [product revenue, item revenue, net item sales]
       - name: line_count
         expr: count(order_item_id)
       - name: average_selling_price
@@ -53,6 +69,9 @@ tables:
       - name: product_name
         expr: product_name
         data_type: varchar
+        ai_context:
+          concept_id: product_name
+          phrases: [product, products]
       - name: category_id
         expr: category_id
         data_type: varchar
@@ -62,6 +81,9 @@ tables:
       - name: is_active
         expr: is_active
         data_type: boolean
+        ai_context:
+          concept_id: inactive_product
+          phrases: [inactive product, inactive products]
     time_dimensions:
       - name: launch_date
         expr: launch_date
@@ -82,10 +104,16 @@ tables:
       - name: payment_method
         expr: payment_method
         data_type: varchar
+        ai_context:
+          concept_id: payment_method
+          phrases: [payment method, payment methods]
     time_dimensions:
       - name: order_date
         expr: order_date
         data_type: date
+        ai_context:
+          concept_id: order_date
+          phrases: [order date, recent sales]
 
 joins:
   - name: order_items_to_products
