@@ -26,6 +26,13 @@ def _load_json_spec(spec_json: str) -> dict[str, Any]:
     return spec
 
 
+def _load_json_object(payload_json: str) -> dict[str, Any]:
+    payload = json.loads(payload_json)
+    if not isinstance(payload, dict):
+        raise TypeError("dbt metadata payload must be a JSON object")
+    return payload
+
+
 def _check_resolved_spec(spec_json: str) -> str:
     spec = _load_json_spec(spec_json)
     result = check_semantic_spec(None, spec)  # type: ignore[arg-type]
@@ -43,8 +50,23 @@ def _check_ddl(ddl_text: str) -> str:
     return f"ok check view_name={result.view_name}"
 
 
+def _check_ddl_with_dbt_meta(ddl_text: str, payload_json: str) -> str:
+    result = load_semantic_ddl(
+        None,
+        ddl_text,
+        validate_only=True,  # type: ignore[arg-type]
+        dbt_metadata=_load_json_object(payload_json),
+    )
+    return f"ok check view_name={result.view_name}"
+
+
 def _load_ddl(conn: Any, ddl_text: str) -> str:
     result = load_semantic_ddl(conn, ddl_text)
+    return f"ok load view_name={result.view_name}"
+
+
+def _load_ddl_with_dbt_meta(conn: Any, ddl_text: str, payload_json: str) -> str:
+    result = load_semantic_ddl(conn, ddl_text, dbt_metadata=_load_json_object(payload_json))
     return f"ok load view_name={result.view_name}"
 
 
@@ -73,9 +95,22 @@ def register_plugin_functions(conn: Any) -> None:
         str,
     )
     conn.create_function(
+        "semduck_check_ddl_with_dbt_meta",
+        lambda ddl_text, payload_json: _check_ddl_with_dbt_meta(ddl_text, payload_json),
+        [str, str],
+        str,
+    )
+    conn.create_function(
         "semduck_load_ddl",
         lambda ddl_text: _load_ddl(conn, ddl_text),
         [str],
+        str,
+        side_effects=True,
+    )
+    conn.create_function(
+        "semduck_load_ddl_with_dbt_meta",
+        lambda ddl_text, payload_json: _load_ddl_with_dbt_meta(conn, ddl_text, payload_json),
+        [str, str],
         str,
         side_effects=True,
     )

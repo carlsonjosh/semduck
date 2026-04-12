@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from semduck.agent import AskExecutionError, AskPlan, ask_question, validate_plan
+from semduck.agent.validation.models import IntentSpec, SemanticConcept, SemanticConceptField, SemanticConceptIndex
+from semduck.agent.validation.plan_validator import _candidate_views
 
 
 class SequencedFakeAgent:
@@ -44,6 +46,40 @@ def test_validate_plan_rejects_wrong_metric_substitution(ecommerce_registry_conn
     assert "product_sales_semantic" in result.candidate_views
     assert any(issue.code == "forbidden_metric_substitution" for issue in result.issues)
     assert any("product_sales_semantic" in line for line in result.retry_feedback)
+
+
+def test_candidate_views_require_matching_concept_kind():
+    index = SemanticConceptIndex(
+        fingerprint="test",
+        concepts=[
+            SemanticConcept(concept_id="orders", concept_kind="dimension"),
+            SemanticConcept(concept_id="orders", concept_kind="metric"),
+        ],
+        fields=[
+            SemanticConceptField(
+                concept_id="orders",
+                concept_kind="dimension",
+                view_name="dimension_view",
+                table_name="orders",
+                field_name="orders_label",
+                field_kind="dimension",
+            ),
+            SemanticConceptField(
+                concept_id="orders",
+                concept_kind="metric",
+                view_name="metric_view",
+                table_name="orders",
+                field_name="order_count",
+                field_kind="metric",
+            ),
+        ],
+    )
+
+    metric_intent = IntentSpec(question_type="rollup", required_metrics=["orders"])
+    dimension_intent = IntentSpec(question_type="breakdown", required_dimensions=["orders"])
+
+    assert _candidate_views(index, metric_intent) == ["metric_view"]
+    assert _candidate_views(index, dimension_intent) == ["dimension_view"]
 
 
 def test_validate_plan_rejects_unsupported_dimension_substitution(ecommerce_registry_conn):
@@ -110,8 +146,8 @@ def test_validate_plan_accepts_signup_month_when_time_field_fallback_is_uncertai
 
     assert result.action == "accept"
     assert result.intent.required_time_grain == "month"
-    assert result.intent.required_time_dimension == "order_date"
-    assert result.intent.required_time_dimension_confident is False
+    assert result.intent.required_time_dimension == "signup_date"
+    assert result.intent.required_time_dimension_confident is True
 
 
 def test_validate_plan_accepts_customer_state_without_requiring_state_synonym(ecommerce_registry_conn):
@@ -230,6 +266,40 @@ def test_ask_question_surfaces_validation_issues_for_unsupported(ecommerce_regis
 
     assert excinfo.value.failure_stage == "validation"
     assert any(issue.code == "unsupported_question" for issue in excinfo.value.validation_issues)
+
+
+def test_ask_question_normalizes_table_qualified_semantic_fields(ecommerce_registry_conn, monkeypatch):
+    monkeypatch.setattr(
+        "semduck.agent.ask._resolve_ask_models",
+        lambda **kwargs: (
+            fake_stage("ask_plan"),
+            None,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        "semduck.agent.ask.create_ask_planner",
+        lambda model: SequencedFakeAgent(
+            [
+                AskPlan(
+                    chosen_view="product_sales_semantic",
+                    dimensions=["products.product_name"],
+                    metrics=["order_items.net_item_sales"],
+                    order_by=["order_items.net_item_sales desc"],
+                )
+            ]
+        ),
+    )
+
+    result = ask_question(
+        ecommerce_registry_conn,
+        "Which products have the highest product revenue?",
+        include_sql=True,
+    )
+
+    assert result.chosen_view == "product_sales_semantic"
+    assert result.semantic_request == "product_sales_semantic dimensions product_name metrics net_item_sales"
+    assert result.order_by == ["net_item_sales desc"]
 
 
 def test_ask_question_retries_when_null_plan_has_false_unsupported_candidate(ecommerce_registry_conn, monkeypatch):

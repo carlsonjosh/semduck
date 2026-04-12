@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, Optional
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -53,6 +53,7 @@ class SemanticObject:
     expr: str
     data_type: Optional[str] = None
     table_name: Optional[str] = None
+    ai_context: dict[str, Any] | None = None
 
 
 @dataclass
@@ -65,6 +66,7 @@ class SemanticTable:
     metrics: dict[str, SemanticObject]
     facts: dict[str, SemanticObject]
     primary_key_columns: list[str] = field(default_factory=list)
+    ai_context: dict[str, Any] | None = None
 
 
 @dataclass
@@ -73,6 +75,7 @@ class SemanticJoin:
     right_table: str
     join_type: str
     join_expr: str
+    ai_context: dict[str, Any] | None = None
 
 
 @dataclass
@@ -80,6 +83,7 @@ class SemanticViewRegistry:
     view_name: str
     tables: dict[str, SemanticTable]
     joins: list[SemanticJoin]
+    ai_context: dict[str, Any] | None = None
 
 
 @dataclass

@@ -33,12 +33,17 @@
   {{ return("(" ~ compiled ~ ") " ~ alias) }}
 {%- endmacro %}
 
-{% macro semduck_load_ddl(ddl_text) -%}
+{% macro semduck_load_ddl(ddl_text, dbt_metadata_json=none) -%}
   {% if not execute %}
     {{ return(none) }}
   {% endif %}
-  {% set check_sql = "select semduck_check_ddl(" ~ dbt_semduck.semduck__sql_literal(ddl_text) ~ ") as status" %}
-  {% set load_sql = "select semduck_load_ddl(" ~ dbt_semduck.semduck__sql_literal(ddl_text) ~ ") as status" %}
+  {% if dbt_metadata_json is none %}
+    {% set check_sql = "select semduck_check_ddl(" ~ dbt_semduck.semduck__sql_literal(ddl_text) ~ ") as status" %}
+    {% set load_sql = "select semduck_load_ddl(" ~ dbt_semduck.semduck__sql_literal(ddl_text) ~ ") as status" %}
+  {% else %}
+    {% set check_sql = "select semduck_check_ddl_with_dbt_meta(" ~ dbt_semduck.semduck__sql_literal(ddl_text) ~ ", " ~ dbt_semduck.semduck__sql_literal(dbt_metadata_json) ~ ") as status" %}
+    {% set load_sql = "select semduck_load_ddl_with_dbt_meta(" ~ dbt_semduck.semduck__sql_literal(ddl_text) ~ ", " ~ dbt_semduck.semduck__sql_literal(dbt_metadata_json) ~ ") as status" %}
+  {% endif %}
   {% do run_query(check_sql) %}
   {% set status = dbt_semduck.semduck__scalar(load_sql) %}
   {{ return(status.split('view_name=')[-1]) }}

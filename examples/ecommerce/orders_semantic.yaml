@@ -1,5 +1,10 @@
 name: orders_semantic
 description: Order-level ecommerce analytics across customers and segments
+ai_context:
+  concepts:
+    - concept_id: marketing_campaign
+      concept_kind: dimension
+      phrases: [marketing campaign, marketing campaigns]
 
 tables:
   - name: orders
@@ -20,10 +25,16 @@ tables:
       - name: payment_method
         expr: payment_method
         data_type: varchar
+        ai_context:
+          concept_id: payment_method
+          phrases: [payment method, payment methods]
     time_dimensions:
       - name: order_date
         expr: order_date
         data_type: date
+        ai_context:
+          concept_id: order_date
+          phrases: [order date, purchase date]
     facts:
       - name: subtotal_amount
         expr: subtotal_amount
@@ -47,14 +58,29 @@ tables:
         expr: sum(discount_amount)
       - name: total_tax
         expr: sum(tax_amount)
+        ai_context:
+          concept_id: total_tax
+          phrases: [tax]
       - name: total_shipping
         expr: sum(shipping_amount)
+        ai_context:
+          concept_id: total_shipping
+          phrases: [shipping revenue]
       - name: net_sales
         expr: sum(total_amount)
+        ai_context:
+          concept_id: net_sales
+          phrases: [net sales]
       - name: order_count
         expr: count(order_id)
+        ai_context:
+          concept_id: order_count
+          phrases: [order count]
       - name: average_order_value
         expr: net_sales / order_count
+        ai_context:
+          concept_id: average_order_value
+          phrases: [average order value]
 
   - name: customers
     base_table:
@@ -74,6 +100,9 @@ tables:
       - name: customer_state
         expr: state
         data_type: varchar
+        ai_context:
+          concept_id: customer_state
+          phrases: [customer state, customer states, state, states]
       - name: customer_country
         expr: country
         data_type: varchar
@@ -81,6 +110,9 @@ tables:
       - name: signup_date
         expr: signup_date
         data_type: date
+        ai_context:
+          concept_id: signup_date
+          phrases: [signup date, signed up, signup month]
 
 joins:
   - name: orders_to_customers

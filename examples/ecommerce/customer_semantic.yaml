@@ -1,5 +1,12 @@
 name: customer_semantic
 description: Customer-centric ecommerce analytics with order history and segment rollups
+ai_context:
+  concepts:
+    - concept_id: recent
+      concept_kind: modifier
+      phrases: [recent, recently]
+      default_window: 30 days
+      time_dimension: order_date
 
 tables:
   - name: customers
@@ -23,6 +30,9 @@ tables:
       - name: state
         expr: state
         data_type: varchar
+        ai_context:
+          concept_id: customer_state
+          phrases: [customer state, customer states, state, states]
       - name: country
         expr: country
         data_type: varchar
@@ -30,9 +40,15 @@ tables:
       - name: signup_date
         expr: signup_date
         data_type: date
+        ai_context:
+          concept_id: signup_date
+          phrases: [signup date, signed up, signup month, signup cohort, acquisition cohort]
     metrics:
       - name: customer_count
         expr: count(distinct customer_id)
+        ai_context:
+          concept_id: customer_count
+          phrases: [customer count, customers]
 
   - name: customer_segments
     base_table:
@@ -43,6 +59,9 @@ tables:
       - name: segment_name
         expr: segment_name
         data_type: varchar
+        ai_context:
+          concept_id: segment_name
+          phrases: [segment, segments]
       - name: segment_type
         expr: segment_type
         data_type: varchar
@@ -59,10 +78,16 @@ tables:
       - name: sales_channel
         expr: sales_channel
         data_type: varchar
+        ai_context:
+          concept_id: sales_channel
+          phrases: [sales channel]
     time_dimensions:
       - name: order_date
         expr: order_date
         data_type: date
+        ai_context:
+          concept_id: order_date
+          phrases: [order date]
     facts:
       - name: total_amount
         expr: total_amount
@@ -70,10 +95,19 @@ tables:
     metrics:
       - name: order_count
         expr: count(order_id)
+        ai_context:
+          concept_id: order_count
+          phrases: [order count]
       - name: lifetime_value
         expr: sum(total_amount)
+        ai_context:
+          concept_id: lifetime_value
+          phrases: [lifetime value]
       - name: average_order_value
         expr: lifetime_value / order_count
+        ai_context:
+          concept_id: average_order_value
+          phrases: [average order value]
 
 joins:
   - name: customers_to_segments

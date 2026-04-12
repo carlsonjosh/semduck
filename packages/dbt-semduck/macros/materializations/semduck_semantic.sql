@@ -1,5 +1,6 @@
 {% materialization semduck_semantic, default %}
-  {%- set loaded_name = dbt_semduck.semduck_load_ddl(compiled_code) -%}
+  {%- set dbt_metadata_json = dbt_semduck.semduck__ddl_metadata_payload(model) -%}
+  {%- set loaded_name = dbt_semduck.semduck_load_ddl(compiled_code, dbt_metadata_json) -%}
   {%- set existing_relation = load_cached_relation(this) -%}
   {%- set target_relation = this.incorporate(type='view') -%}
   {%- set intermediate_relation = make_intermediate_relation(target_relation) -%}

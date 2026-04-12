@@ -1,4 +1,5 @@
 from semduck import compile_request_sql, load_semantic_ddl
+from semduck.authoring.ddl_loader import parse_semantic_ddl
 
 
 VALID_DDL = """
@@ -93,3 +94,116 @@ table orders as mart.orders_base
         assert "Unexpected semantic DDL line" in str(exc)
     else:
         raise AssertionError("expected semantic-name-first table declaration to fail")
+
+
+def test_load_semantic_ddl_accepts_ai_context(conn):
+    ddl = """
+create semantic view orders_semantic as
+ai_context '{"concepts":[{"concept_id":"recent","concept_kind":"modifier","phrases":["recent"]}]}'
+table mart.orders_base as orders
+  ai_context '{"phrases":["orders"]}'
+  dimensions (
+    region as region ai_context '{"concept_id":"region","phrases":["region","regions"]}'
+  )
+  metrics (
+    count(order_id) as order_count ai_context '{"concept_id":"order_count","phrases":["order count"]}'
+  );
+"""
+    result = load_semantic_ddl(conn, ddl, validate_only=True)
+    assert result.ok is True
+
+
+def test_parse_semantic_ddl_accepts_native_ai_context_blocks():
+    ddl = """
+create semantic view orders_semantic as
+ai_context (
+  concept recent (
+    concept_kind modifier
+    phrases ('recent', 'recently')
+    default_window '30 days'
+    time_dimension order_date
+  )
+)
+table mart.orders_base as orders
+  ai_context (
+    phrases ('orders')
+  )
+  dimensions (
+    region as region ai_context (
+      concept region (
+        phrases ('region', 'regions')
+        preferred true
+      )
+      concept geography_region (
+        phrases ('sales region')
+        notes 'Regional business label'
+      )
+    )
+  )
+  metrics (
+    count(order_id) as order_count ai_context (
+      concept order_count (
+        phrases ('order count')
+        requires_filter false
+      )
+    )
+  )
+
+join orders_to_customers:
+  left_table orders
+  right_table customers
+  join_type left
+  on LEFT_TABLE.customer_id = RIGHT_TABLE.customer_id
+  ai_context (
+    notes 'Orders join to customer grain'
+  );
+"""
+    spec = parse_semantic_ddl(ddl)
+    assert spec["ai_context"]["concepts"][0] == {
+        "concept_id": "recent",
+        "concept_kind": "modifier",
+        "phrases": ["recent", "recently"],
+        "default_window": "30 days",
+        "time_dimension": "order_date",
+    }
+    assert spec["tables"][0]["ai_context"] == {"phrases": ["orders"]}
+    assert spec["tables"][0]["dimensions"][0]["ai_context"]["concepts"] == [
+        {
+            "concept_id": "region",
+            "phrases": ["region", "regions"],
+            "preferred": True,
+        },
+        {
+            "concept_id": "geography_region",
+            "phrases": ["sales region"],
+            "notes": "Regional business label",
+        },
+    ]
+    assert spec["tables"][0]["metrics"][0]["ai_context"]["concepts"] == [
+        {
+            "concept_id": "order_count",
+            "phrases": ["order count"],
+            "requires_filter": False,
+        }
+    ]
+    assert spec["joins"][0]["ai_context"] == {"notes": "Orders join to customer grain"}
+
+
+def test_load_semantic_ddl_rejects_unknown_native_ai_context_property(conn):
+    ddl = """
+create semantic view orders_semantic as
+table mart.orders_base as orders
+  dimensions (
+    region as region ai_context (
+      concept region (
+        unsupported_key foo
+      )
+    )
+  );
+"""
+    try:
+        load_semantic_ddl(conn, ddl, validate_only=True)
+    except Exception as exc:
+        assert "Unknown concept region property: unsupported_key" in str(exc)
+    else:
+        raise AssertionError("expected native ai_context validation failure")

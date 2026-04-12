@@ -89,6 +89,7 @@ def _describe_object(obj: SemanticObject) -> SemanticObjectDescriptor:
         object_type=obj.object_type,
         expr=obj.expr,
         data_type=obj.data_type,
+        ai_context=obj.ai_context,
     )
 
 
@@ -105,6 +106,7 @@ def _describe_table(table: SemanticTable) -> SemanticTableDescriptor:
         dimensions=descriptors,
         metrics=[_describe_object(table.metrics[name]) for name in sorted(table.metrics)],
         facts=[_describe_object(table.facts[name]) for name in sorted(table.facts)],
+        ai_context=table.ai_context,
     )
 
 
@@ -118,9 +120,11 @@ def _describe_registry(registry: SemanticViewRegistry) -> SemanticViewDescriptor
                 right_table=join.right_table,
                 join_type=join.join_type,
                 join_expr=join.join_expr,
+                ai_context=join.ai_context,
             )
             for join in registry.joins
         ],
+        ai_context=registry.ai_context,
     )
 
 

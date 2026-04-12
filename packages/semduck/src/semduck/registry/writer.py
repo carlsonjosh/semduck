@@ -14,6 +14,12 @@ def _primary_key_columns(table_spec: dict[str, Any]) -> str | None:
     return json.dumps(columns) if columns else None
 
 
+def _json_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    return json.dumps(value, sort_keys=True)
+
+
 def _delete_existing(conn: Any, view_name: str) -> None:
     for table_name in (
         "semantic.joins",
@@ -47,10 +53,10 @@ def write_semantic_view(
 
         conn.execute(
             """
-            insert into semantic.semantic_views (view_name, description, source_yaml)
-            values (?, ?, ?)
+            insert into semantic.semantic_views (view_name, description, ai_context, source_yaml)
+            values (?, ?, ?, ?)
             """,
-            [view_name, description, source_yaml],
+            [view_name, description, _json_text(spec.get("ai_context")), source_yaml],
         )
 
         for table_spec in spec.get("tables", []):
@@ -61,8 +67,8 @@ def write_semantic_view(
                 """
                 insert into semantic.semantic_view_tables (
                     view_name, table_name, physical_schema, physical_table, table_alias,
-                    primary_key_columns, description
-                ) values (?, ?, ?, ?, ?, ?, ?)
+                    primary_key_columns, description, ai_context
+                ) values (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     view_name,
@@ -72,6 +78,7 @@ def write_semantic_view(
                     table_alias,
                     _primary_key_columns(table_spec),
                     table_spec.get("description"),
+                    _json_text(table_spec.get("ai_context")),
                 ],
             )
 
@@ -79,8 +86,8 @@ def write_semantic_view(
                 conn.execute(
                     """
                     insert into semantic.dimensions (
-                        view_name, table_name, dimension_name, dimension_kind, expr, data_type, description
-                    ) values (?, ?, ?, 'dimension', ?, ?, ?)
+                        view_name, table_name, dimension_name, dimension_kind, expr, data_type, description, ai_context
+                    ) values (?, ?, ?, 'dimension', ?, ?, ?, ?)
                     """,
                     [
                         view_name,
@@ -89,6 +96,7 @@ def write_semantic_view(
                         dimension["expr"],
                         dimension.get("data_type"),
                         dimension.get("description"),
+                        _json_text(dimension.get("ai_context")),
                     ],
                 )
 
@@ -96,8 +104,8 @@ def write_semantic_view(
                 conn.execute(
                     """
                     insert into semantic.dimensions (
-                        view_name, table_name, dimension_name, dimension_kind, expr, data_type, description
-                    ) values (?, ?, ?, 'time_dimension', ?, ?, ?)
+                        view_name, table_name, dimension_name, dimension_kind, expr, data_type, description, ai_context
+                    ) values (?, ?, ?, 'time_dimension', ?, ?, ?, ?)
                     """,
                     [
                         view_name,
@@ -106,6 +114,7 @@ def write_semantic_view(
                         dimension["expr"],
                         dimension.get("data_type"),
                         dimension.get("description"),
+                        _json_text(dimension.get("ai_context")),
                     ],
                 )
 
@@ -113,8 +122,8 @@ def write_semantic_view(
                 conn.execute(
                     """
                     insert into semantic.facts (
-                        view_name, table_name, fact_name, expr, data_type, description
-                    ) values (?, ?, ?, ?, ?, ?)
+                        view_name, table_name, fact_name, expr, data_type, description, ai_context
+                    ) values (?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
                         view_name,
@@ -123,6 +132,7 @@ def write_semantic_view(
                         fact["expr"],
                         fact.get("data_type"),
                         fact.get("description"),
+                        _json_text(fact.get("ai_context")),
                     ],
                 )
 
@@ -130,8 +140,8 @@ def write_semantic_view(
                 conn.execute(
                     """
                     insert into semantic.metrics (
-                        view_name, table_name, metric_name, expr, description
-                    ) values (?, ?, ?, ?, ?)
+                        view_name, table_name, metric_name, expr, description, ai_context
+                    ) values (?, ?, ?, ?, ?, ?)
                     """,
                     [
                         view_name,
@@ -139,6 +149,7 @@ def write_semantic_view(
                         metric["name"],
                         metric["expr"],
                         metric.get("description"),
+                        _json_text(metric.get("ai_context")),
                     ],
                 )
 
@@ -146,8 +157,8 @@ def write_semantic_view(
             conn.execute(
                 """
                 insert into semantic.joins (
-                    view_name, join_name, left_table, right_table, join_type, join_expr, description
-                ) values (?, ?, ?, ?, ?, ?, ?)
+                    view_name, join_name, left_table, right_table, join_type, join_expr, description, ai_context
+                ) values (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     view_name,
@@ -157,6 +168,7 @@ def write_semantic_view(
                     join["join_type"],
                     join["join_expr"],
                     join.get("description"),
+                    _json_text(join.get("ai_context")),
                 ],
             )
 

@@ -199,8 +199,8 @@ def test_safe_multihop_join_resolution(conn):
     conn.execute(
         """
         insert into semantic.metrics
-        (view_name, table_name, metric_name, metric_type, expr)
-        values ('sample', 'orders', 'm1', 'sum', 'revenue')
+        (view_name, table_name, metric_name, expr)
+        values ('sample', 'orders', 'm1', 'sum(revenue)')
         """
     )
     conn.execute(
@@ -239,8 +239,8 @@ def test_unsafe_multihop_join_rejected(conn):
     conn.execute(
         """
         insert into semantic.metrics
-        (view_name, table_name, metric_name, metric_type, expr)
-        values ('sample', 'orders', 'm1', 'sum', 'revenue')
+        (view_name, table_name, metric_name, expr)
+        values ('sample', 'orders', 'm1', 'sum(revenue)')
         """
     )
     conn.execute(
