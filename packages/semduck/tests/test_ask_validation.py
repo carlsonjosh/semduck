@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from semduck.agent import AskExecutionError, AskPlan, ask_question, validate_plan
+from semduck.agent.validation.models import IntentSpec, SemanticConcept, SemanticConceptField, SemanticConceptIndex
+from semduck.agent.validation.plan_validator import _candidate_views
 
 
 class SequencedFakeAgent:
@@ -44,6 +46,40 @@ def test_validate_plan_rejects_wrong_metric_substitution(ecommerce_registry_conn
     assert "product_sales_semantic" in result.candidate_views
     assert any(issue.code == "forbidden_metric_substitution" for issue in result.issues)
     assert any("product_sales_semantic" in line for line in result.retry_feedback)
+
+
+def test_candidate_views_require_matching_concept_kind():
+    index = SemanticConceptIndex(
+        fingerprint="test",
+        concepts=[
+            SemanticConcept(concept_id="orders", concept_kind="dimension"),
+            SemanticConcept(concept_id="orders", concept_kind="metric"),
+        ],
+        fields=[
+            SemanticConceptField(
+                concept_id="orders",
+                concept_kind="dimension",
+                view_name="dimension_view",
+                table_name="orders",
+                field_name="orders_label",
+                field_kind="dimension",
+            ),
+            SemanticConceptField(
+                concept_id="orders",
+                concept_kind="metric",
+                view_name="metric_view",
+                table_name="orders",
+                field_name="order_count",
+                field_kind="metric",
+            ),
+        ],
+    )
+
+    metric_intent = IntentSpec(question_type="rollup", required_metrics=["orders"])
+    dimension_intent = IntentSpec(question_type="breakdown", required_dimensions=["orders"])
+
+    assert _candidate_views(index, metric_intent) == ["metric_view"]
+    assert _candidate_views(index, dimension_intent) == ["dimension_view"]
 
 
 def test_validate_plan_rejects_unsupported_dimension_substitution(ecommerce_registry_conn):

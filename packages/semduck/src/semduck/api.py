@@ -17,6 +17,18 @@ from semduck.runtime.executor import compile_semantic_request, execute_semantic_
 from semduck.types import CompiledSemanticQuery, LoadResult, ParsedSemanticRequest, SemanticViewRegistry
 
 
+def _merge_unique_strings(existing: list[Any], overlay: list[Any]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for item in list(existing) + list(overlay):
+        if not isinstance(item, str):
+            continue
+        if item not in seen:
+            seen.add(item)
+            merged.append(item)
+    return merged
+
+
 def _merge_ai_context(
     existing: dict[str, Any] | None,
     overlay: dict[str, Any] | None,
@@ -34,8 +46,13 @@ def _merge_ai_context(
         if key == "concepts" and isinstance(existing_value, list) and isinstance(overlay_value, list):
             merged[key] = _merge_ai_context_concepts(existing_value, overlay_value)
             continue
+        if key == "phrases" and isinstance(existing_value, list) and isinstance(overlay_value, list):
+            merged[key] = _merge_unique_strings(existing_value, overlay_value)
+            continue
         if isinstance(existing_value, dict) and isinstance(overlay_value, dict):
             merged[key] = _merge_ai_context(existing_value, overlay_value)
+            continue
+        merged[key] = deepcopy(overlay_value)
     return merged
 
 
@@ -60,6 +77,19 @@ def _merge_ai_context_concepts(
         existing_index = concept_positions[concept_id]
         existing_concept = merged[existing_index]
         if isinstance(existing_concept, dict):
+            existing_kind = existing_concept.get("concept_kind")
+            overlay_kind = overlay_concept.get("concept_kind")
+            if (
+                isinstance(existing_kind, str)
+                and isinstance(overlay_kind, str)
+                and existing_kind.strip()
+                and overlay_kind.strip()
+                and existing_kind != overlay_kind
+            ):
+                raise SemanticValidationError(
+                    f"Conflicting concept_kind values for ai_context concept '{concept_id}': "
+                    f"{existing_kind!r} vs {overlay_kind!r}"
+                )
             merged[existing_index] = _merge_ai_context(existing_concept, overlay_concept)
     return merged
 

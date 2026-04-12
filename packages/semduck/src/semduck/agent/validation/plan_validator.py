@@ -97,12 +97,16 @@ def _normalize_time_bucket_aliases(plan: Any, chosen_view: Any | None, *, add_is
 
 
 def _candidate_views(index: SemanticConceptIndex, intent) -> list[str]:
-    required = set(intent.required_dimensions).union(intent.required_metrics, intent.required_modifiers)
+    required = (
+        {(concept_id, "dimension") for concept_id in intent.required_dimensions}
+        .union((concept_id, "metric") for concept_id in intent.required_metrics)
+        .union((concept_id, "modifier") for concept_id in intent.required_modifiers)
+    )
     if not required:
         return sorted({field.view_name for field in index.fields})
-    per_view: dict[str, set[str]] = {}
+    per_view: dict[str, set[tuple[str, str]]] = {}
     for field in index.fields:
-        per_view.setdefault(field.view_name, set()).add(field.concept_id)
+        per_view.setdefault(field.view_name, set()).add((field.concept_id, field.concept_kind))
     return sorted(view_name for view_name, concepts in per_view.items() if required.issubset(concepts))
 
 

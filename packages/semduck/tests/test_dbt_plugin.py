@@ -238,3 +238,90 @@ table mart.customer_base as customers
         assert "ambiguous across multiple semantic objects" in str(exc)
     else:
         raise AssertionError("expected ambiguous dbt column ai_context to fail")
+
+
+def test_load_semantic_ddl_merges_same_concept_id_overlay_properties(loaded_conn):
+    ddl_text = """
+create semantic view sample as
+table mart.orders_base as orders
+  metrics (
+    count(order_id) as order_count ai_context (
+      concept order_count (
+        concept_kind metric
+        phrases ('orders')
+      )
+    )
+  );
+"""
+    dbt_metadata = {
+        "columns": {
+            "order_count": {
+                "meta": {
+                    "ai_context": {
+                        "concepts": [
+                            {
+                                "concept_id": "order_count",
+                                "concept_kind": "metric",
+                                "phrases": ["order count"],
+                                "preferred": True,
+                                "default_window": "30 days",
+                                "time_dimension": "order_date",
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    load_semantic_ddl(loaded_conn, ddl_text, dbt_metadata=dbt_metadata)
+    registry = get_semantic_view(loaded_conn, "sample")
+    concept = registry.tables["orders"].metrics["order_count"].ai_context["concepts"][0]
+
+    assert concept == {
+        "concept_id": "order_count",
+        "concept_kind": "metric",
+        "phrases": ["orders", "order count"],
+        "preferred": True,
+        "default_window": "30 days",
+        "time_dimension": "order_date",
+    }
+
+
+def test_load_semantic_ddl_rejects_conflicting_concept_kind_overlay(conn):
+    ddl_text = """
+create semantic view sample as
+table mart.orders_base as orders
+  metrics (
+    count(order_id) as order_count ai_context (
+      concept order_count (
+        concept_kind metric
+        phrases ('orders')
+      )
+    )
+  );
+"""
+    dbt_metadata = {
+        "columns": {
+            "order_count": {
+                "meta": {
+                    "ai_context": {
+                        "concepts": [
+                            {
+                                "concept_id": "order_count",
+                                "concept_kind": "dimension",
+                                "phrases": ["orders"],
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    try:
+        load_semantic_ddl(conn, ddl_text, validate_only=True, dbt_metadata=dbt_metadata)
+    except SemanticValidationError as exc:
+        assert "Conflicting concept_kind values" in str(exc)
+    else:
+        raise AssertionError("expected conflicting concept_kind overlay to fail")
