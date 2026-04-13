@@ -29,7 +29,7 @@ The dbt-facing macros and materializations live in the separate `dbt-semduck` pa
 
 ## Python Version
 
-The packaged project currently targets Python `>=3.11,<3.13`.
+The packaged project currently targets Python `>=3.11,<3.14`.
 
 ## Local Development
 
@@ -37,7 +37,7 @@ From the repository root:
 
 ```bash
 uv sync
-uv run pytest
+uv run --group dev python -m pytest
 ```
 
 ## What To Read Next

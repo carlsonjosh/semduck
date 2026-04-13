@@ -1,70 +1,138 @@
 # Quickstart
 
-This walkthrough uses the standalone Python package and CLI path. It assumes you already have a DuckDB database and a semantic definition file.
+This walkthrough starts from scratch with a public weather dataset and then shows the same Semduck flow through both the CLI and the Python API.
 
-## 1. Initialize The Registry
+It uses Vega Datasets `weather.csv`, which contains daily weather observations for Seattle and New York.
+Source: [weather.csv](https://cdn.jsdelivr.net/npm/vega-datasets@3.2.1/data/weather.csv), [dataset metadata](https://vega.github.io/vega-datasets/datapackage.html)
 
-Create the semduck registry schema in your target DuckDB database:
-
-```bash
-semduck init --db demo.duckdb
-```
-
-This creates the semantic schema and supporting registry tables that semduck reads from when compiling requests.
-
-## 2. Load A Semantic Definition
-
-YAML:
+## 1. Install And Download The Dataset
 
 ```bash
-semduck load --db demo.duckdb --file orders_semantic.yaml
+pip install semduck
+curl -L https://cdn.jsdelivr.net/npm/vega-datasets@3.2.1/data/weather.csv -o weather.csv
 ```
 
-DDL:
+## 2. Create A DuckDB Database
 
-```bash
-semduck load --db demo.duckdb --format ddl --file orders_semantic.sql
-```
-
-The CLI supports `--format auto|yaml|ddl`. In `auto` mode, semduck infers the format from the file extension or the first non-empty line.
-
-## 3. Compile Or Execute A Request
-
-Compile to SQL:
-
-```bash
-semduck compile --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
-```
-
-Execute directly:
-
-```bash
-semduck query --db demo.duckdb --request "orders_semantic dimensions region metrics total_revenue"
-```
-
-## 4. Equivalent Python API
+Use DuckDB through Python to create a local database file and load the CSV into a table named `weather_raw`:
 
 ```python
 import duckdb
-from semduck import compile_request_sql, init_registry, load_semantic_yaml_file
 
-conn = duckdb.connect("demo.duckdb")
-init_registry(conn)
-load_semantic_yaml_file(conn, "orders_semantic.yaml")
-
-sql = compile_request_sql(
-    conn,
-    "orders_semantic dimensions region metrics total_revenue",
+conn = duckdb.connect("weather.duckdb")
+conn.execute(
+    """
+    create or replace table weather_raw as
+    select *
+    from read_csv(?, auto_detect=true)
+    """,
+    ["weather.csv"],
 )
-print(sql)
+conn.close()
 ```
 
-## 5. Use The Example Project
+## 3. Load The Semantic View
 
-The repository includes a working dbt-backed example database in `examples/dbt_example`.
+This repository includes a ready-to-use semantic definition at `packages/semduck/examples/weather_semantic.yaml`.
 
-- Standalone Python example: `packages/semduck/examples/query_existing_db.py`
-- CLI wrapper: `packages/semduck/examples/query_existing_db_cli.sh`
+=== "CLI"
+
+    ```bash
+    semduck init --db weather.duckdb
+    semduck load --db weather.duckdb --file packages/semduck/examples/weather_semantic.yaml
+    ```
+
+=== "Python"
+
+    ```python
+    import duckdb
+    from semduck import init_registry, load_semantic_yaml_file
+
+    conn = duckdb.connect("weather.duckdb")
+    init_registry(conn)
+    load_semantic_yaml_file(conn, "packages/semduck/examples/weather_semantic.yaml")
+    conn.close()
+    ```
+
+The CLI supports `--format auto|yaml|ddl` for semantic definition files. In `auto` mode, Semduck infers the format from the file extension or the first non-empty line.
+
+## 4. Compile A Request
+
+=== "CLI"
+
+    ```bash
+    semduck compile --db weather.duckdb --request "weather dimensions location, weather metrics day_count, avg_temp_max"
+    ```
+
+=== "Python"
+
+    ```python
+    import duckdb
+    from semduck import compile_request_sql
+
+    conn = duckdb.connect("weather.duckdb")
+    sql = compile_request_sql(
+        conn,
+        "weather dimensions location, weather metrics day_count, avg_temp_max",
+    )
+    print(sql)
+    conn.close()
+    ```
+
+## 5. Execute A Request
+
+=== "CLI"
+
+    ```bash
+    semduck query --db weather.duckdb --request "weather dimensions location, weather metrics day_count, avg_temp_max"
+    ```
+
+=== "Python"
+
+    ```python
+    import duckdb
+    from semduck import execute_request
+
+    conn = duckdb.connect("weather.duckdb")
+    result = execute_request(
+        conn,
+        "weather dimensions location, weather metrics day_count, avg_temp_max",
+    )
+    print(result.fetchall())
+    conn.close()
+    ```
+
+## 6. Try A Derived Time Dimension
+
+Once the basic query works, try a derived dimension:
+
+=== "CLI"
+
+    ```bash
+    semduck query --db weather.duckdb --request "weather dimensions date_trunc('month', date) as month, location metrics total_precipitation"
+    ```
+
+=== "Python"
+
+    ```python
+    import duckdb
+    from semduck import execute_request
+
+    conn = duckdb.connect("weather.duckdb")
+    result = execute_request(
+        conn,
+        "weather dimensions date_trunc('month', date) as month, location metrics total_precipitation",
+    )
+    print(result.fetchall())
+    conn.close()
+    ```
+
+## 7. Use The Larger Example Project
+
+The repository also includes a richer dbt-backed example in `examples/dbt_example`.
+
+- Standalone Python example against the checked-in dbt example database: `packages/semduck/examples/query_existing_db.py`
+- CLI wrapper around that database: `packages/semduck/examples/query_existing_db_cli.sh`
 - End-to-end dbt project: `examples/dbt_example`
 
 ## Next Steps

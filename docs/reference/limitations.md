@@ -14,6 +14,7 @@ This project is still early. The docs should make the current boundaries explici
 - `ask` depends on external LLM provider configuration.
 - MCP guidance assumes a local `stdio` server workflow.
 - GitHub Pages docs are versionless for now; the site represents the latest `main`.
+- DuckDB file locking still applies to Semduck examples that operate on a checked-in `.duckdb` file. Semduck processes must follow DuckDB's concurrency rules: either one process holds a read/write connection, or multiple processes hold read-only connections. See [DuckDB concurrency](https://duckdb.org/docs/current/connect/concurrency). If another DuckDB process has that file open in a conflicting mode, close it first or copy the database to a temporary path.
 
 ## Documentation Policy
 

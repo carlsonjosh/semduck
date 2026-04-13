@@ -41,8 +41,7 @@ Create a dbt model using the `semduck_semantic` materialization:
 ```jinja
 {{ config(materialized='semduck_semantic') }}
 
-create semantic view orders_semantic as
-table orders as {{ ref('orders') }}
+create semantic view orders as
 table {{ ref('orders') }} as orders
   dimensions (
     region as region
@@ -53,6 +52,11 @@ table {{ ref('orders') }} as orders
 ```
 
 The model loads the semantic definition into the registry and produces a lightweight relation containing the semantic view name.
+
+The dbt model name and the semantic view name are separate concepts:
+
+- `ref('sev_orders')` points at the dbt model that registers the semantic definition.
+- `create semantic view orders as ...` defines the semantic view name used inside Semduck requests.
 
 ## Query From Downstream Models
 
@@ -96,3 +100,5 @@ dbt deps --profiles-dir .
 dbt seed --profiles-dir .
 dbt run --profiles-dir .
 ```
+
+The checked-in `jaffle_shop.duckdb` file is an ordinary DuckDB database. Semduck processes must follow DuckDB's concurrency rules: either one process holds a read/write connection, or multiple processes hold read-only connections. See [DuckDB concurrency](https://duckdb.org/docs/current/connect/concurrency). If another DuckDB process already has this file open in a conflicting mode, close that session first or copy the file to a temporary path before querying it.

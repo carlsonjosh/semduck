@@ -1,0 +1,40 @@
+name: weather
+description: Daily weather observations grouped by location and weather type
+tables:
+  - name: weather
+    base_table:
+      table: weather_raw
+    time_dimensions:
+      - name: date
+        expr: date
+        data_type: date
+    dimensions:
+      - name: location
+        expr: location
+        data_type: varchar
+      - name: weather
+        expr: weather
+        data_type: varchar
+    facts:
+      - name: precipitation
+        expr: precipitation
+        data_type: double
+      - name: temp_max
+        expr: temp_max
+        data_type: double
+      - name: temp_min
+        expr: temp_min
+        data_type: double
+      - name: wind
+        expr: wind
+        data_type: double
+    metrics:
+      - name: day_count
+        expr: count(*)
+        description: Number of daily observations
+      - name: avg_temp_max
+        expr: avg(temp_max)
+        description: Average maximum daily temperature
+      - name: total_precipitation
+        expr: sum(precipitation)
+        description: Total precipitation

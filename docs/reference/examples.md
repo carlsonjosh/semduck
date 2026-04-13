@@ -5,8 +5,11 @@ The repository already includes several runnable examples. This page is the inde
 ## Standalone Python And CLI
 
 - `packages/semduck/examples/quickstart.py`: in-memory Python quickstart that creates a table, loads YAML, and compiles a request.
+- `packages/semduck/examples/weather_semantic.yaml`: semantic definition used by the public weather quickstart.
 - `packages/semduck/examples/query_existing_db.py`: compile and execute a request against the checked-in example database.
 - `packages/semduck/examples/query_existing_db_cli.sh`: CLI wrapper around the same example database.
+
+The checked-in example database is a normal DuckDB file, so Semduck processes must follow DuckDB's concurrency rules: either one process holds a read/write connection, or multiple processes hold read-only connections. See [DuckDB concurrency](https://duckdb.org/docs/current/connect/concurrency). If you hit a file-lock error, close the other session or copy the database to a temporary path before running these examples.
 
 ## Ask
 

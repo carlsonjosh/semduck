@@ -27,7 +27,12 @@ dbt seed --profiles-dir .
 dbt run --profiles-dir .
 ```
 
-The semantic node registers `orders_semantic`, and the example shows both downstream query styles.
+The semantic node registers the semantic view `orders`, and the example shows both downstream query styles.
+
+The names are intentionally different:
+
+- `sev_orders` is the dbt model you `ref(...)`.
+- `orders` is the semantic view name declared inside the DDL and used by Semduck internally.
 
 Use `from_query(...)` when you want a `FROM`-safe relation without writing parentheses yourself:
 
@@ -54,5 +59,7 @@ with semduck_query as (
 select *
 from semduck_query
 ```
+
+The checked-in `jaffle_shop.duckdb` file can be locked if another DuckDB client already has it open. Semduck processes must follow DuckDB's concurrency rules: either one process holds a read/write connection, or multiple processes hold read-only connections. See [DuckDB concurrency](https://duckdb.org/docs/current/connect/concurrency). If that happens, close the other session or copy the file to a temporary location before running standalone examples against it.
 
 See the main docs site for installation, package boundaries, and a broader dbt integration guide.

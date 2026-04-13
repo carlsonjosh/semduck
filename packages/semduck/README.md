@@ -181,6 +181,6 @@ The design note for that boundary lives in [`_project/decisions/remove_yaml_in_d
 
 ```bash
 uv sync
-uv run pytest
+uv run --group dev python -m pytest
 uv run tox
 ```
