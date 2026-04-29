@@ -113,13 +113,14 @@ The same runtime powers:
 
 - [Quickstart](docs/getting-started/quickstart.md)
 - [How Semduck Works](docs/guides/how-semduck-works.md)
-- [Choosing An Integration](docs/guides/choosing-an-integration.md)
+- [Choosing An Interface](docs/guides/choosing-an-interface.md)
+- [Contributing](CONTRIBUTING.md)
 - [Package README](packages/semduck)
 - [Docs Site Source](docs)
 
 ## Packages
 
-- [`packages/semduck`](packages/semduck): Python runtime, CLI, compiler, registry, MCP server, ask workflow, and DuckDB integration
+- [`packages/semduck`](packages/semduck): Python runtime, CLI, compiler, registry, MCP server, ask workflow, and DuckDB interface
 - [`packages/dbt-semduck`](packages/dbt-semduck): dbt macros and materializations for semantic view registration and query compilation
 
 ## Repo Layout
@@ -133,4 +134,4 @@ The same runtime powers:
 
 - Python: `3.11` through `3.13`
 - DuckDB: `1.4+`
-- dbt integration: `dbt-duckdb` `1.9.x` or newer within the supported range
+- dbt interface: `dbt-duckdb` `1.9.x` or newer within the supported range
