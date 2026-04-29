@@ -12,7 +12,7 @@ Examples:
 
 ```text
 orders_semantic dimensions region metrics total_revenue
-orders_semantic dimensions customer_name metrics total_revenue where region = 'US'
+orders_semantic dimensions customer_name, order_date metrics total_revenue, item_count where region = 'US'
 ```
 
 ## Request Parts
@@ -24,7 +24,7 @@ orders_semantic dimensions customer_name metrics total_revenue where region = 'U
 
 ## Compile Before Query
 
-When building an integration, especially with MCP or AI tooling, semduck works best when you compile first and only execute after the request succeeds.
+When building an interface, especially with MCP or AI tooling, semduck works best when you compile first and only execute after the request succeeds.
 
 CLI:
 

@@ -18,7 +18,7 @@ The registry is a DuckDB schema managed by `semduck init`. It stores semantic vi
 Semduck supports two authoring formats:
 
 - YAML for standalone Python and CLI usage
-- semantic DDL for standalone usage and dbt integration
+- semantic DDL for standalone usage and the dbt interface
 
 In dbt, semduck deliberately uses inline DDL rather than YAML-in-dbt. That keeps the Python runtime dbt-agnostic and avoids unresolved `ref(...)` or `source(...)` behavior in YAML.
 

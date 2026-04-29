@@ -11,6 +11,7 @@ theme:
     - navigation.expand
     - navigation.top
     - content.code.copy
+    - content.tabs.link
     - search.highlight
     - search.suggest
 
@@ -34,17 +35,18 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
+  - Interfaces:
+      - Python API: interfaces/python-api.md
+      - dbt: interfaces/dbt.md
+      - MCP: interfaces/mcp.md
+      - CLI: interfaces/cli.md
+      - Ask: interfaces/ask.md
   - Guides:
       - How Semduck Works: guides/how-semduck-works.md
-      - Choosing An Integration: guides/choosing-an-integration.md
-      - Semantic Definitions: guides/semantic-definitions.md
-      - Request Language: guides/request-language.md
-      - CLI: guides/cli.md
-      - Python API: guides/python-api.md
-      - dbt: guides/dbt.md
-      - MCP: guides/mcp.md
+      - Defining Views: guides/semantic-definitions.md
+      - Making Requests: guides/request-language.md
+      - Choosing An Interface: guides/choosing-an-interface.md
       - MCP Best Practices: guides/mcp-best-practices.md
-      - Ask: guides/ask.md
   - Reference:
       - API Surface: reference/api.md
       - Examples: reference/examples.md

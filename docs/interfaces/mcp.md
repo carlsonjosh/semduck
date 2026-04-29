@@ -2,7 +2,7 @@
 
 Semduck can run as a FastMCP server over `stdio`.
 
-If you are exposing Semduck to Codex Desktop or other MCP clients on an ongoing basis, read [MCP Best Practices](mcp-best-practices.md) alongside this page.
+If you are exposing Semduck to Codex Desktop or other MCP clients on an ongoing basis, read [MCP Best Practices](../guides/mcp-best-practices.md) alongside this page.
 
 ## Start The Server
 

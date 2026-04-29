@@ -2,11 +2,11 @@
 
 Semduck is a semantic layer for DuckDB built for local analytics.
 
-It helps you define semantic views once, then reuse those definitions across people, scripts, apps, and agents. Instead of rebuilding the same joins and metrics in raw SQL every time, you ask for dimensions, metrics, and filters and let Semduck compile the query.
+It helps you define semantic views once, then reuse those definitions across queries, scripts, apps, and agents. Instead of rebuilding the same joins and metrics in raw SQL every time, you ask for dimensions, metrics, and filters and let Semduck compile the query.
 
 ## The Problem
 
-DuckDB makes local analysis fast. The hard part is keeping the meaning of the data consistent once more than one query, notebook, script, or tool is involved.
+While DuckDB makes local analysis fast. Keeping the meaning of your data consistent once more than one query, notebook, script, or tool is involved gets to be time consuming at best and wrong at worst.
 
 Typical failure modes:
 
@@ -21,7 +21,7 @@ Semduck addresses that gap with semantic views stored in DuckDB and a small requ
 
 1. Author a semantic view in YAML or semantic DDL.
 2. Load it into the Semduck registry in DuckDB.
-3. Ask for metrics, dimensions, and filters.
+3. Write requests for metrics, dimensions, and filters.
 4. Compile to SQL or execute directly.
 
 Example:
@@ -36,7 +36,7 @@ semduck query --db demo.duckdb --request "orders_semantic dimensions region metr
 
 The request stays semantic. Semduck resolves the view definition, joins, and metric expressions for you.
 
-## Where It Fits
+## How to use it
 
 - Python or CLI: local scripts, notebooks, and direct analysis workflows
 - dbt: semantic views authored with inline DDL and queried from downstream models
@@ -48,9 +48,13 @@ The request stays semantic. Semduck resolves the view definition, joins, and met
 - [Installation](getting-started/installation.md)
 - [Quickstart](getting-started/quickstart.md)
 - [How Semduck Works](guides/how-semduck-works.md)
-- [Choosing An Integration](guides/choosing-an-integration.md)
-- [CLI Guide](guides/cli.md)
-- [Python API Guide](guides/python-api.md)
-- [dbt Guide](guides/dbt.md)
-- [MCP Guide](guides/mcp.md)
+- [Choosing An Interface](guides/choosing-an-interface.md)
 - [MCP Best Practices](guides/mcp-best-practices.md)
+
+## Interfaces
+
+- [CLI Guide](interfaces/cli.md)
+- [Python API Guide](interfaces/python-api.md)
+- [dbt Guide](interfaces/dbt.md)
+- [MCP Guide](interfaces/mcp.md)
+- [Ask Guide](interfaces/ask.md)

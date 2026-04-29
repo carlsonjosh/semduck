@@ -2,6 +2,8 @@
 
 This walkthrough starts from scratch with a public weather dataset and then shows the same Semduck flow through both the CLI and the Python API.
 
+If you are using `dbt-duckdb`, skip this page and go to the [dbt interface guide](../interfaces/dbt.md). The dbt setup and query flow are different enough that they are documented separately.
+
 It uses Vega Datasets `weather.csv`, which contains daily weather observations for Seattle and New York.
 Source: [weather.csv](https://cdn.jsdelivr.net/npm/vega-datasets@3.2.1/data/weather.csv), [dataset metadata](https://vega.github.io/vega-datasets/datapackage.html)
 
@@ -10,6 +12,12 @@ Source: [weather.csv](https://cdn.jsdelivr.net/npm/vega-datasets@3.2.1/data/weat
 ```bash
 pip install semduck
 curl -L https://cdn.jsdelivr.net/npm/vega-datasets@3.2.1/data/weather.csv -o weather.csv
+```
+
+If you prefer `uv`, install Semduck with:
+
+```bash
+uv add semduck
 ```
 
 ## 2. Create A DuckDB Database
@@ -31,32 +39,151 @@ conn.execute(
 conn.close()
 ```
 
-## 3. Load The Semantic View
-
-This repository includes a ready-to-use semantic definition at `packages/semduck/examples/weather_semantic.yaml`.
+Semduck also needs its registry schema initialized in that same database before you load any semantic definitions.
 
 === "CLI"
 
     ```bash
     semduck init --db weather.duckdb
-    semduck load --db weather.duckdb --file packages/semduck/examples/weather_semantic.yaml
     ```
 
 === "Python"
 
     ```python
     import duckdb
-    from semduck import init_registry, load_semantic_yaml_file
+    from semduck import init_registry
 
     conn = duckdb.connect("weather.duckdb")
     init_registry(conn)
-    load_semantic_yaml_file(conn, "packages/semduck/examples/weather_semantic.yaml")
     conn.close()
     ```
 
-The CLI supports `--format auto|yaml|ddl` for semantic definition files. In `auto` mode, Semduck infers the format from the file extension or the first non-empty line.
+## 3. Define The Semantic View
 
-## 4. Compile A Request
+You can define the same semantic view in either YAML or semantic DDL.
+
+=== "YAML"
+
+    Create a file named `weather_semantic.yaml` with:
+
+    ```yaml
+    name: weather
+    description: Daily weather observations grouped by location and weather type
+    tables:
+      - name: weather
+        base_table:
+          table: weather_raw
+        time_dimensions:
+          - name: date
+            expr: date
+            data_type: date
+        dimensions:
+          - name: location
+            expr: location
+            data_type: varchar
+          - name: weather
+            expr: weather
+            data_type: varchar
+        facts:
+          - name: precipitation
+            expr: precipitation
+            data_type: double
+          - name: temp_max
+            expr: temp_max
+            data_type: double
+          - name: temp_min
+            expr: temp_min
+            data_type: double
+          - name: wind
+            expr: wind
+            data_type: double
+        metrics:
+          - name: day_count
+            expr: count(*)
+            description: Number of daily observations
+          - name: avg_temp_max
+            expr: avg(temp_max)
+            description: Average maximum daily temperature
+          - name: total_precipitation
+            expr: sum(precipitation)
+            description: Total precipitation
+    ```
+
+=== "DDL"
+
+    Create a file named `weather_semantic.sql` with:
+
+    ```sql
+    create semantic view weather as
+    table weather_raw as weather
+      time_dimensions (
+        date as date type date
+      )
+      dimensions (
+        location as location type varchar,
+        weather as weather type varchar
+      )
+      facts (
+        precipitation as precipitation type double,
+        temp_max as temp_max type double,
+        temp_min as temp_min type double,
+        wind as wind type double
+      )
+      metrics (
+        count(*) as day_count description 'Number of daily observations',
+        avg(temp_max) as avg_temp_max description 'Average maximum daily temperature',
+        sum(precipitation) as total_precipitation description 'Total precipitation'
+      );
+    ```
+
+The `weather_raw` table name in both versions comes from step 2.
+
+## 4. Load The Semantic View
+
+Load the definition file you created into the initialized database:
+
+=== "YAML"
+
+    === "CLI"
+
+        ```bash
+        semduck load --db weather.duckdb --file weather_semantic.yaml
+        ```
+
+    === "Python"
+
+        ```python
+        import duckdb
+        from semduck import load_semantic_yaml_file
+
+        conn = duckdb.connect("weather.duckdb")
+        load_semantic_yaml_file(conn, "weather_semantic.yaml")
+        conn.close()
+        ```
+
+=== "DDL"
+
+    === "CLI"
+
+        ```bash
+        semduck load --db weather.duckdb --format ddl --file weather_semantic.sql
+        ```
+
+    === "Python"
+
+        ```python
+        import duckdb
+        from semduck import load_semantic_ddl_file
+
+        conn = duckdb.connect("weather.duckdb")
+        load_semantic_ddl_file(conn, "weather_semantic.sql")
+        conn.close()
+        ```
+
+The CLI supports `--format auto|yaml|ddl` for semantic definition files. In `auto` mode, Semduck infers the format from the file extension or the first non-empty line. The default mode is `auto`.
+
+## 5. Compile A Request
+The compile step allows you to identify if a given request is valid without executing the query in the database. 
 
 === "CLI"
 
@@ -79,7 +206,8 @@ The CLI supports `--format auto|yaml|ddl` for semantic definition files. In `aut
     conn.close()
     ```
 
-## 5. Execute A Request
+## 6. Execute A Request
+Use `query` to retrieve data.
 
 === "CLI"
 
@@ -102,7 +230,7 @@ The CLI supports `--format auto|yaml|ddl` for semantic definition files. In `aut
     conn.close()
     ```
 
-## 6. Try A Derived Time Dimension
+## 7. Try A Derived Time Dimension
 
 Once the basic query works, try a derived dimension:
 
@@ -127,7 +255,7 @@ Once the basic query works, try a derived dimension:
     conn.close()
     ```
 
-## 7. Use The Larger Example Project
+## 8. Use The Larger Example Project
 
 The repository also includes a richer dbt-backed example in `examples/dbt_example`.
 
@@ -139,4 +267,4 @@ The repository also includes a richer dbt-backed example in `examples/dbt_exampl
 
 - Learn the [request language](../guides/request-language.md).
 - Choose between [YAML and DDL definitions](../guides/semantic-definitions.md).
-- Move to [dbt](../guides/dbt.md), [MCP](../guides/mcp.md), or [ask](../guides/ask.md) if you need those integrations.
+- Move to the [dbt](../interfaces/dbt.md), [MCP](../interfaces/mcp.md), or [ask](../interfaces/ask.md) interfaces if you need those workflows.

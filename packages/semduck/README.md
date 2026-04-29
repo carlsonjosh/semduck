@@ -16,7 +16,7 @@ Supported baseline:
 pip install semduck
 ```
 
-Install the dbt integration dependency only if you are registering the DuckDB plugin in a `dbt-duckdb` project:
+Install the dbt support extra only if you are registering the DuckDB plugin in a `dbt-duckdb` project:
 
 ```bash
 pip install "semduck[dbt]"
@@ -27,10 +27,10 @@ pip install "semduck[dbt]"
 - Standalone Python package and CLI:
   - YAML semantic specs
   - semantic DDL
-- dbt integration through `dbt-semduck`:
+- dbt interface through `dbt-semduck`:
   - inline semantic DDL only
 
-YAML is supported for standalone Python and CLI usage. The dbt integration deliberately uses DDL instead of YAML-in-dbt so `semduck` stays dbt-agnostic.
+YAML is supported for standalone Python and CLI usage. The dbt interface deliberately uses DDL instead of YAML-in-dbt so `semduck` stays dbt-agnostic.
 
 ## Quickstart
 
@@ -100,7 +100,7 @@ The docs site covers:
 - request language semantics
 - CLI command reference
 - Python API guidance
-- dbt integration
+- dbt interface
 - MCP server setup
 - `ask` provider configuration
 

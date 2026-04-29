@@ -118,7 +118,7 @@ If the choice is still ambiguous, ask which server to use.
 Always state which Semduck server and semantic view answered the question.
 ```
 
-That instruction is short enough to be practical and specific enough to change behavior.
+That instruction is short enough to be practical to include in system instructions and specific enough to change behavior.
 
 ## Recommended Agent Workflow
 
