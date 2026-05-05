@@ -198,3 +198,27 @@ def test_cli_status_reporter_prints_expected_format(capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == "status: planning semantic request\n"
+
+
+def test_cli_check_reports_malformed_yaml_without_traceback(tmp_path, capsys):
+    path = tmp_path / "broken.yaml"
+    path.write_text("name: [\n", encoding="utf-8")
+
+    code = main(["check", "--db", ":memory:", "--file", str(path)])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "error: Invalid YAML:" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_cli_ask_reports_malformed_config_without_traceback(tmp_path, capsys):
+    path = tmp_path / "broken-config.yaml"
+    path.write_text("llm: [\n", encoding="utf-8")
+
+    code = main(["ask", "--db", ":memory:", "--config", str(path), "--question", "hi"])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "error[configuration]: Invalid LLM config YAML:" in captured.err
+    assert "Traceback" not in captured.err
