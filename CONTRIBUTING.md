@@ -39,3 +39,21 @@ If you change public behavior, update the relevant docs page alongside the code.
 - make sure the relevant tests pass
 - update docs or examples when behavior changes
 - keep changes scoped to the problem you are solving
+
+## Publishing To PyPI
+
+The `semduck` Python package is published from GitHub Actions using PyPI trusted publishing.
+
+The workflow lives at `.github/workflows/pypi-publish.yml` and supports two paths:
+
+- publish automatically when a GitHub Release is published
+- publish manually with `workflow_dispatch` for an existing release or tag
+
+Before the first publish, configure a trusted publisher for the `semduck` project on PyPI that matches:
+
+- owner: `carlsonjosh`
+- repository: `semduck`
+- workflow: `pypi-publish.yml`
+- environment: `pypi`
+
+After that, publishing should not require storing a PyPI API token in GitHub.
