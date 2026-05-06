@@ -44,6 +44,10 @@ class SemduckServiceError(Exception):
         self.detail = detail
 
 
+def _service_error(code: str, message: str) -> SemduckServiceError:
+    return SemduckServiceError(ServiceErrorDetail(code=code, message=message))
+
+
 def _normalize_error(exc: SemanticViewError) -> SemduckServiceError:
     name = type(exc).__name__.removesuffix("Error").replace("Semantic", "", 1)
     code_chars: list[str] = []
@@ -52,7 +56,17 @@ def _normalize_error(exc: SemanticViewError) -> SemduckServiceError:
             code_chars.append("_")
         code_chars.append(char.lower())
     code = "".join(code_chars) or "semantic_view"
-    return SemduckServiceError(ServiceErrorDetail(code=code, message=str(exc)))
+    return _service_error(code, str(exc))
+
+
+def _normalize_nonsemantic_error(exc: Exception) -> SemduckServiceError:
+    if isinstance(exc, FileNotFoundError):
+        return _service_error("file_not_found", str(exc))
+    if isinstance(exc, ValueError):
+        return _service_error("validation", str(exc))
+    if isinstance(exc, duckdb.Error):
+        return _service_error("runtime", str(exc))
+    return _service_error("runtime", str(exc))
 
 
 def _infer_definition_format(path: str, explicit_format: str) -> str:
@@ -149,6 +163,8 @@ def check_definition_service(conn: Any, args: CheckDefinitionArgs) -> CheckDefin
         )
     except SemanticViewError as exc:
         raise _normalize_error(exc) from exc
+    except (FileNotFoundError, ValueError, duckdb.Error) as exc:
+        raise _normalize_nonsemantic_error(exc) from exc
 
 
 def load_definition_service(conn: Any, args: LoadDefinitionArgs) -> LoadDefinitionResult:
@@ -162,6 +178,8 @@ def load_definition_service(conn: Any, args: LoadDefinitionArgs) -> LoadDefiniti
         )
     except SemanticViewError as exc:
         raise _normalize_error(exc) from exc
+    except (FileNotFoundError, ValueError, duckdb.Error) as exc:
+        raise _normalize_nonsemantic_error(exc) from exc
 
 
 def compile_request_service(conn: Any, args: CompileRequestArgs) -> CompileRequestResult:
@@ -174,6 +192,8 @@ def compile_request_service(conn: Any, args: CompileRequestArgs) -> CompileReque
         )
     except SemanticViewError as exc:
         raise _normalize_error(exc) from exc
+    except duckdb.Error as exc:
+        raise _normalize_nonsemantic_error(exc) from exc
 
 
 def query_request_service(conn: Any, args: QueryRequestArgs) -> QueryRequestResult:
@@ -192,8 +212,7 @@ def query_request_service(conn: Any, args: QueryRequestArgs) -> QueryRequestResu
     except SemanticViewError as exc:
         raise _normalize_error(exc) from exc
     except duckdb.Error as exc:
-        detail = ServiceErrorDetail(code="runtime", message=str(exc))
-        raise SemduckServiceError(detail) from exc
+        raise _normalize_nonsemantic_error(exc) from exc
 
 
 def list_semantic_views_service(conn: Any, args: ListSemanticViewsArgs | None = None) -> ListSemanticViewsResult:
@@ -207,7 +226,7 @@ def list_semantic_views_service(conn: Any, args: ListSemanticViewsArgs | None = 
             or "table with name semantic_views does not exist" in error_message
         ):
             return ListSemanticViewsResult(view_names=[])
-        raise
+        raise _normalize_nonsemantic_error(exc) from exc
 
 
 def describe_semantic_view_service(conn: Any, args: DescribeSemanticViewArgs) -> SemanticViewDescriptor:
@@ -216,3 +235,5 @@ def describe_semantic_view_service(conn: Any, args: DescribeSemanticViewArgs) ->
         return _describe_registry(registry)
     except SemanticViewError as exc:
         raise _normalize_error(exc) from exc
+    except duckdb.Error as exc:
+        raise _normalize_nonsemantic_error(exc) from exc

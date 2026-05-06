@@ -88,6 +88,16 @@ def test_load_llm_config_reads_task_specific_models(tmp_path):
     assert config.tasks["ask_summary"] == TaskLLMConfig(provider="local_openai", model="summary-model")
 
 
+def test_load_llm_config_rejects_malformed_yaml(tmp_path):
+    config_path = tmp_path / "semduck.yaml"
+    config_path.write_text("llm: [\n", encoding="utf-8")
+
+    with pytest.raises(ValueError) as excinfo:
+        load_llm_config(config_path)
+
+    assert "Invalid LLM config YAML:" in str(excinfo.value)
+
+
 def test_resolve_llm_config_uses_override_precedence():
     config = LLMConfig(
         default_provider="ollama",

@@ -149,3 +149,14 @@ tables:
 """
     result = load_semantic_yaml(conn, yaml_text, validate_only=True)
     assert result.ok is True
+
+
+def test_malformed_yaml_is_normalized(conn):
+    yaml_text = "name: [\n"
+
+    try:
+        load_semantic_yaml(conn, yaml_text, validate_only=True)
+    except SemanticValidationError as exc:
+        assert "Invalid YAML:" in str(exc)
+    else:
+        raise AssertionError("expected SemanticValidationError")

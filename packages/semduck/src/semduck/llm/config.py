@@ -68,7 +68,10 @@ def load_llm_config(path: str | Path | None = None, *, env: Mapping[str, str] | 
     if not selected_path.exists():
         raise FileNotFoundError(f"Config file not found: {selected_path}")
 
-    payload = yaml.safe_load(selected_path.read_text(encoding="utf-8")) or {}
+    try:
+        payload = yaml.safe_load(selected_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Invalid LLM config YAML: {exc}") from exc
     llm_payload = payload.get("llm") if isinstance(payload, dict) else None
     if llm_payload is None:
         return LLMConfig()

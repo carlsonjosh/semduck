@@ -9,7 +9,10 @@ from semduck.errors import SemanticValidationError
 
 
 def load_yaml_spec(yaml_text: str) -> dict[str, Any]:
-    spec = yaml.safe_load(yaml_text)
+    try:
+        spec = yaml.safe_load(yaml_text)
+    except yaml.YAMLError as exc:
+        raise SemanticValidationError(f"Invalid YAML: {exc}") from exc
     if not isinstance(spec, dict):
         raise SemanticValidationError("YAML must define a mapping at the top level")
     validate_semantic_spec(spec)

@@ -91,3 +91,17 @@ jobs:
 
       - name: Run dbt integration test
         run: python -m pytest integration_tests/test_dbt_semduck_integration.py
+
+  compatibility:
+    name: Compatibility
+    if: ${{ always() }}
+    needs:
+      - core
+      - dbt
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify required matrix jobs succeeded
+        run: |
+          test "${{ needs.core.result }}" = "success"
+          test "${{ needs.dbt.result }}" = "success"
