@@ -22,7 +22,6 @@ tables:
         expr: region
     metrics:
       - name: order_count
-        metric_type: count
         expr: count(order_id)
 ```
 

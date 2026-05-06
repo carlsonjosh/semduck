@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import duckdb
+from pathlib import Path
 
 from semduck.agent import (
     CheckDefinitionArgs,
@@ -117,5 +118,27 @@ def test_describe_semantic_view_service_normalizes_errors(conn):
     except SemduckServiceError as exc:
         assert exc.detail.code == "registry"
         assert "missing_view" in exc.detail.message
+    else:
+        raise AssertionError("Expected SemduckServiceError")
+
+
+def test_check_definition_service_normalizes_missing_files(conn):
+    try:
+        check_definition_service(conn, CheckDefinitionArgs(file=str(Path("/tmp/semduck-missing.yaml"))))
+    except SemduckServiceError as exc:
+        assert exc.detail.code == "file_not_found"
+    else:
+        raise AssertionError("Expected SemduckServiceError")
+
+
+def test_check_definition_service_normalizes_malformed_yaml(conn, tmp_path):
+    yaml_path = tmp_path / "broken.yaml"
+    yaml_path.write_text("name: [\n", encoding="utf-8")
+
+    try:
+        check_definition_service(conn, CheckDefinitionArgs(file=str(yaml_path)))
+    except SemduckServiceError as exc:
+        assert exc.detail.code == "validation"
+        assert "Invalid YAML:" in exc.detail.message
     else:
         raise AssertionError("Expected SemduckServiceError")
