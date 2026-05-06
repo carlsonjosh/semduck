@@ -4,7 +4,7 @@ members = ["packages/semduck"]
 [dependency-groups]
 dev = [
   "pytest",
-  "tox>=4.24",
+  "tox>=4.53.1",
   "dbt-duckdb>=1.9,<1.11",
   "numpy>=2.4.4",
   "faker>=40.12.0",
