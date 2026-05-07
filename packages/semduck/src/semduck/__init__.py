@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from semduck.agent import (
     AskExecutionError,
     AskPlan,
@@ -56,7 +58,6 @@ from semduck.llm import (
     resolve_llm_config,
     resolve_llm_task_configs,
 )
-from semduck.mcp import build_mcp_server, run_mcp_server
 from semduck.api import (
     check_semantic_spec,
     compile_request,
@@ -202,3 +203,14 @@ __all__ = [
     "run_mcp_server",
     "validate_plan",
 ]
+
+
+def __getattr__(name: str):
+    if name in {"build_mcp_server", "run_mcp_server"}:
+        from semduck.mcp import build_mcp_server, run_mcp_server
+
+        return {
+            "build_mcp_server": build_mcp_server,
+            "run_mcp_server": run_mcp_server,
+        }[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

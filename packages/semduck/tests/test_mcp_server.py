@@ -2,11 +2,28 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+import sys
 
 import duckdb
 import yaml
 
 from semduck.mcp import build_mcp_server
+
+
+def test_import_semduck_does_not_eagerly_import_mcp():
+    sys.modules.pop("semduck", None)
+    sys.modules.pop("semduck.mcp", None)
+    sys.modules.pop("semduck.mcp.server", None)
+
+    import semduck
+
+    assert "semduck.mcp" not in sys.modules
+    assert "semduck.mcp.server" not in sys.modules
+
+    build = semduck.build_mcp_server
+
+    assert callable(build)
+    assert "semduck.mcp" in sys.modules
 
 
 def test_build_mcp_server_registers_expected_components():
