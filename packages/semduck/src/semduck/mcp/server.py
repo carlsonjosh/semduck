@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import duckdb
 from fastmcp import FastMCP
 
 from semduck.agent.models import (
@@ -23,6 +22,7 @@ from semduck.agent.services import (
     load_definition_service,
     query_request_service,
 )
+from semduck.connections import connect_database
 from semduck.llm import load_and_resolve_llm_config
 
 
@@ -36,7 +36,7 @@ class ServerDependencies:
 
     def connect(self):
         if self.conn is None:
-            self.conn = duckdb.connect(self.db_path)
+            self.conn = connect_database(self.db_path)
         return self.conn
 
 

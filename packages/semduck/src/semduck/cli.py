@@ -4,11 +4,10 @@ import argparse
 import sys
 from pathlib import Path
 
-import duckdb
-
 from semduck.agent import AskExecutionError, ask_question, format_ask_result_json, format_ask_result_text
 from semduck.api import compile_request, init_registry, load_semantic_ddl_file, load_semantic_yaml_file
 from semduck.agent.services import SemduckServiceError
+from semduck.connections import connect_database
 from semduck.errors import SemanticViewError
 
 
@@ -68,7 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _connect(path: str):
-    return duckdb.connect(path)
+    return connect_database(path)
 
 
 def _infer_definition_format(path: str, explicit_format: str) -> str:

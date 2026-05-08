@@ -22,6 +22,11 @@ def orders_yaml_path() -> Path:
 
 
 @pytest.fixture
+def weather_yaml_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "examples" / "weather_semantic.yaml"
+
+
+@pytest.fixture
 def loaded_conn(conn, orders_yaml_path):
     conn.execute("create schema mart")
     conn.execute(
