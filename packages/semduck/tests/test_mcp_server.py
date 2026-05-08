@@ -148,10 +148,8 @@ def test_mcp_server_reuses_connection_for_memory_database(orders_yaml_path):
         assert path == ":memory:"
         return conn
 
-    from semduck.mcp import server as server_module
-
-    original_connect = server_module.duckdb.connect
-    server_module.duckdb.connect = fake_connect
+    original_connect = build_mcp_server.__globals__["connect_database"]
+    build_mcp_server.__globals__["connect_database"] = fake_connect
     try:
         server = build_mcp_server(db_path=":memory:")
         init_tool = asyncio.run(server.get_tool("init_registry"))
@@ -170,7 +168,7 @@ def test_mcp_server_reuses_connection_for_memory_database(orders_yaml_path):
             )
         )
     finally:
-        server_module.duckdb.connect = original_connect
+        build_mcp_server.__globals__["connect_database"] = original_connect
         conn.close()
 
     assert connect_calls == 1

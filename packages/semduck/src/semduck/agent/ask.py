@@ -34,6 +34,7 @@ from semduck.errors import (
     SemanticUnsupportedError,
     SemanticViewError,
 )
+from semduck.connections import connect_database
 from semduck.llm import (
     create_provider_registry,
     load_llm_config,
@@ -1054,7 +1055,7 @@ def _connect_if_needed(conn_or_db: Any) -> tuple[Any, bool]:
     if hasattr(conn_or_db, "sql") and hasattr(conn_or_db, "execute"):
         return conn_or_db, False
     path = str(conn_or_db)
-    return duckdb.connect(path), True
+    return connect_database(path), True
 
 
 async def ask_question_async(
